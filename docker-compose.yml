@@ -1,0 +1,81 @@
+services:
+  crawler:
+    build: .
+    ports:
+      - '3000:3000'
+    volumes:
+      - crawler_storage:/usr/src/app/storage
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - DATABASE_URL=postgres://crawl:crawl@db:5432/crawl
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    profiles: ['queue']
+
+  crawler-queue:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: pnpm crawler-queue worker
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - INPUT_FILE=/usr/src/app/data/url_queue_urls.txt
+      - OUT_DIR=/usr/src/app/out
+      - BLACKLIST_DOMAINS_FILE=/usr/src/app/data/blacklist_domains.txt
+    depends_on:
+      - redis
+    profiles: ['queue']
+
+  crawler-enqueue:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: pnpm crawler-queue enqueue
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - INPUT_FILE=/usr/src/app/data/url_queue_urls.txt
+      - OUT_DIR=/usr/src/app/out
+      - BLACKLIST_DOMAINS_FILE=/usr/src/app/data/blacklist_domains.txt
+    depends_on:
+      - redis
+    profiles: ['queue']
+
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: crawl
+      POSTGRES_PASSWORD: crawl
+      POSTGRES_DB: crawl
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U crawl -d crawl']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  crawler_storage:
+  postgres_data:
