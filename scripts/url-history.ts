@@ -659,13 +659,29 @@ function processHistoryFiles(dataDir: string): {
   return { urlStats, sorted, report }
 }
 
-function savePrioritizedQueue(sorted: PrioritizedUrl[], outputFilePath: string): void {
-  fs.writeFileSync(outputFilePath, JSON.stringify(sorted, null, 2))
-  console.log(`\nSaved ${sorted.length} prioritized URLs to ${outputFilePath}`)
+function main() {
+  const dataDir = path.resolve(process.cwd(), 'data')
+  const outputFilePath = path.join(dataDir, 'url_queue.json')
 
-  const urlListPath = outputFilePath.replace(/\.json$/i, '_urls.txt')
-  fs.writeFileSync(urlListPath, sorted.map((s) => s.url).join('\n') + '\n')
-  console.log(`Saved ${sorted.length} URLs (one per line) to ${urlListPath}`)
+  if (!fs.existsSync(dataDir)) {
+    console.error('data/ directory not found. Place browser history JSON files there.')
+    process.exit(1)
+  }
+
+  const { sorted, report } = processHistoryFiles(dataDir)
+
+  const output = {
+    stats: {
+      total_items: report.total_items,
+      unique_kept: report.unique_kept,
+      blocked_items: report.blocked_items,
+      blocked_by_reason: report.blocked_by_reason,
+    },
+    urls: sorted,
+  }
+
+  fs.writeFileSync(outputFilePath, JSON.stringify(output, null, 2))
+  console.log(`\nSaved ${sorted.length} URLs to ${outputFilePath}`)
 
   console.log('\nTop 50 URLs by visit frequency:')
   console.log('-'.repeat(80))
@@ -677,23 +693,6 @@ function savePrioritizedQueue(sorted: PrioritizedUrl[], outputFilePath: string):
     hostname: trim(new URL(item.url).hostname),
   }))
   console.table(topUrls)
-}
-
-function main() {
-  const dataDir = path.resolve(process.cwd(), 'data')
-  const outputFilePath = path.join(dataDir, 'url_queue.json')
-  const reportPath = path.join(dataDir, 'url_filter_report.json')
-
-  if (!fs.existsSync(dataDir)) {
-    console.error('data/ directory not found. Place browser history JSON files there.')
-    process.exit(1)
-  }
-
-  const { sorted, report } = processHistoryFiles(dataDir)
-  savePrioritizedQueue(sorted, outputFilePath)
-
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
-  console.log(`Saved filter report to ${reportPath}`)
 }
 
 main()
