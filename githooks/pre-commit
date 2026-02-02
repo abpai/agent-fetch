@@ -1,0 +1,8 @@
+#!/bin/sh
+# Run the precommit command defined in your package.json
+pnpm run precommit
+# Capture the exit status
+RESULT=$?
+# If the command failed (non-zero exit code), abort the commit
+[ $RESULT -ne 0 ] && exit 1
+exit 0
