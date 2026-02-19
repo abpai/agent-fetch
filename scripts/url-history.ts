@@ -444,7 +444,7 @@ function normalizeUrl(
 
 function titleMatchesBlacklist(title: string): boolean {
   const normalized = title.trim()
-  if (!normalized) return true
+  if (!normalized) return false
 
   const titleLower = normalized.toLowerCase()
 
@@ -488,8 +488,6 @@ function isDynamicListingUrl(rawUrl: string): boolean {
   try {
     const url = new URL(rawUrl)
     const pathname = url.pathname.replace(/\/+$/, '') || '/'
-
-    if (pathname === '/') return true
     if (DYNAMIC_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) return true
 
     for (const key of DYNAMIC_QUERY_KEYS) {
@@ -580,7 +578,8 @@ function processHistoryFiles(dataDir: string): {
     const filePath = path.join(dataDir, file)
     try {
       const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-      const history: HistoryItem[] = content['Browser History'] || []
+      const rawHistory = content['Browser History']
+      const history: HistoryItem[] = Array.isArray(rawHistory) ? rawHistory : []
 
       for (const item of history) {
         totalItems++
@@ -646,12 +645,9 @@ function processHistoryFiles(dataDir: string): {
     total_items: totalItems,
     unique_kept: urlStats.size,
     blocked_items: blockedCount,
-    blocked_by_reason: Object.entries(reasonCounts)
-      .sort((a, b) => b[1] - a[1])
-      .reduce(
-        (acc, [k, v]) => ({ ...acc, [k]: v }),
-        {} as Record<string, number>
-      ),
+    blocked_by_reason: Object.fromEntries(
+      Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])
+    ),
     samples: reasonSamples,
     config: cfg,
   }
