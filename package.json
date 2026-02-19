@@ -17,6 +17,11 @@
     "test": "vitest",
     "format": "prettier --write .",
     "lint": "eslint .",
+    "queue:generate": "pnpm exec tsx scripts/url-history.ts",
+    "queue:stats": "node scripts/queue-cli.mjs stats",
+    "queue:list": "node scripts/queue-cli.mjs list",
+    "queue:peek": "node scripts/queue-cli.mjs peek",
+    "queue:pop": "node scripts/queue-cli.mjs pop",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
