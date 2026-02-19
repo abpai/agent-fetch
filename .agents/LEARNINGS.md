@@ -10,3 +10,4 @@
 - `scripts/queue-cli.mjs` computes `queue_size` for display in `stats` and persists `queue_remaining` only on mutating commands via `saveQueue`.
 - `queue-cli` command parsing must treat non-numeric `list/peek/pop` first args as `queueFile` paths to match the documented `[count] [queueFile]` signature.
 - Keep `User-Agent` consistent across fetch/jsdom/playwright paths by passing resolved headers into jsdom rendering.
+- For app-server crawl workflows: store policy/default response modes in `AGENTS.md`, and keep executable command steps in `SKILL.md`.

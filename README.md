@@ -92,6 +92,70 @@ node scripts/queue-cli.mjs remove https://example.com/article
 
 See `ARCHITECTURE.md` for flow details.
 
+## Codex App Server Mode (R2 Artifacts)
+
+Run `codex app-server` on the crawl host (for example, Raspberry Pi), then use shell commands to crawl and upload raw content to Cloudflare R2.
+
+Default goal: return artifact metadata, not full page bodies, unless explicitly requested.
+
+### Recommended Instruction Split
+
+- `AGENTS.md`: policy and defaults for this repo/session.
+- `SKILL.md`: operational command workflow for crawl jobs.
+- App server developer instructions: short, global behavior only.
+
+Use `AGENTS.md` for behavior policy. Keep exact command steps in `SKILL.md`.
+
+### Cloudflare R2 Notes
+
+- You do not need a long-running Cloudflare CLI process.
+- `wrangler` is optional for setup/admin tasks.
+- Runtime uploads can use S3-compatible APIs (`aws s3 cp`, SDKs, or a small script).
+
+Suggested env vars on the crawl host:
+
+- `R2_ACCOUNT_ID`
+- `R2_BUCKET`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+
+### Example `AGENTS.md` Instructions (App Server Mode)
+
+```md
+## Crawl Artifact Policy (App Server Mode)
+
+When a user asks to crawl a URL, run the crawl locally via shell on this host.
+
+Default output mode is `artifact`:
+1. Save raw content to a temp file.
+2. Compute `sha256` and byte size.
+3. Upload raw file to Cloudflare R2.
+4. Return metadata only:
+   - `artifact_id`
+   - `bucket`
+   - `key`
+   - `bytes`
+   - `sha256`
+   - `expires_at`
+   - `signed_url` (or retrieval command)
+
+Only inline full raw content when the prompt explicitly asks for `raw-inline`.
+
+If prompt asks for `raw`, return artifact metadata plus retrieval info.
+If prompt asks for `summary` or `extract`, operate from crawled content, keep response concise, and include artifact metadata for traceability.
+
+Never store credentials in repo files. Read R2 credentials from environment variables.
+```
+
+### Example Runtime Upload Command
+
+```bash
+aws s3 cp /tmp/crawl/$ARTIFACT_ID.html s3://$R2_BUCKET/crawl/$ARTIFACT_ID.html \
+  --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+```
+
+Configure lifecycle rules on the bucket to auto-expire objects after your desired TTL.
+
 ## Use in a Queue Worker
 
 ```typescript
