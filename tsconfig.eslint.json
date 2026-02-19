@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "outDir": "./.tsbuild-eslint"
+  },
+  "include": ["src/**/*", "scripts/**/*", "vitest.config.ts", "eslint.config.js"]
+}
