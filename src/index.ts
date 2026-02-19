@@ -119,6 +119,7 @@ const turndown = new TurndownService({
 let browser: Browser | null = null
 let context: BrowserContext | null = null
 let contextInit: Promise<BrowserContext> | null = null
+let contextHeadersKey: string | null = null
 
 const buildHeaders = (options: CrawlOptions, overrides?: Record<string, string>): Record<string, string> => {
   const headers: Record<string, string> = {
@@ -154,6 +155,9 @@ const splitUserAgentHeader = (
 
   return { userAgent, extraHeaders }
 }
+
+const toHeadersKey = (headers: Record<string, string>): string =>
+  JSON.stringify(Object.entries(headers).sort(([a], [b]) => a.localeCompare(b)))
 
 const createTimeoutSignal = (timeoutMs: number) => {
   const controller = new AbortController()
@@ -216,18 +220,20 @@ const extractFromHtml = (url: string, html: string, strategy: CrawlStrategy): Cr
   let title = ''
   let author: string | null = null
   let markdown = ''
+  let dom: JSDOM | null = null
 
   try {
-    const dom = new JSDOM(html, { url })
+    dom = new JSDOM(html, { url })
     const reader = new Readability(dom.window.document)
     const article = reader.parse()
 
     title = article?.title || dom.window.document.title || ''
     author = article?.byline || null
     markdown = article?.content ? turndown.turndown(article.content) : turndown.turndown(html)
-    dom.window.close()
   } catch {
     markdown = turndown.turndown(html)
+  } finally {
+    dom?.window.close()
   }
 
   return {
@@ -271,7 +277,12 @@ const fetchHtml = async (url: string, options: CrawlOptions, headers: Record<str
   }
 }
 
-const renderWithJsdom = async (url: string, html: string, options: CrawlOptions) => {
+const renderWithJsdom = async (
+  url: string,
+  html: string,
+  options: CrawlOptions,
+  userAgent?: string
+) => {
   const timeoutMs = options.jsdomTimeout ?? options.timeout ?? DEFAULT_TIMEOUT_MS
   const virtualConsole = new VirtualConsole()
   virtualConsole.on('error', () => undefined)
@@ -281,7 +292,7 @@ const renderWithJsdom = async (url: string, html: string, options: CrawlOptions)
     runScripts: 'dangerously',
     resources: 'usable',
     pretendToBeVisual: true,
-    userAgent: options.userAgent || DEFAULT_USER_AGENT,
+    userAgent: userAgent || options.userAgent || DEFAULT_USER_AGENT,
     virtualConsole,
   })
 
@@ -311,23 +322,42 @@ const renderWithJsdom = async (url: string, html: string, options: CrawlOptions)
 }
 
 async function getBrowser(headers: Record<string, string>): Promise<BrowserContext> {
+  const nextHeadersKey = toHeadersKey(headers)
+
   if (browser && !browser.isConnected()) {
     browser = null
     context = null
+    contextHeadersKey = null
   }
 
-  if (browser && context) {
+  if (context && contextHeadersKey === nextHeadersKey) {
     return context
+  }
+
+  if (contextInit) {
+    await contextInit
+    if (context && contextHeadersKey === nextHeadersKey) {
+      return context
+    }
   }
 
   if (!contextInit) {
     contextInit = (async () => {
       const { userAgent, extraHeaders } = splitUserAgentHeader(headers)
-      browser = await chromium.launch({ headless: true })
+      if (!browser) {
+        browser = await chromium.launch({ headless: true })
+      }
+
+      if (context) {
+        await context.close()
+        context = null
+      }
+
       context = await browser.newContext({
         userAgent,
         extraHTTPHeaders: extraHeaders,
       })
+      contextHeadersKey = nextHeadersKey
       return context
     })().finally(() => {
       contextInit = null
@@ -370,11 +400,7 @@ const withPlaywright = async (
   }
 }
 
-const withScrapeDo = async (
-  url: string,
-  options: CrawlOptions,
-  _headers: Record<string, string>
-): Promise<CrawlResult> => {
+const withScrapeDo = async (url: string, options: CrawlOptions): Promise<CrawlResult> => {
   const config = options.scrapeDo
   if (!config?.token) {
     throw new Error('Scrape.do token missing')
@@ -411,98 +437,98 @@ export async function crawl(url: string, options: CrawlOptions = {}): Promise<Cr
 
   const headers = buildHeaders(options)
   let fetchedHtml: string | null = null
+  const recordAttempt = (attempt: CrawlAttempt) => {
+    attempts.push(attempt)
+  }
+  const recordRejectedAttempt = (strategy: CrawlStrategy, reason: string) => {
+    recordAttempt({ strategy, ok: false, reason })
+  }
+  const recordFailedAttempt = (strategy: CrawlStrategy, error: unknown) => {
+    recordAttempt({
+      strategy,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+  const getAcceptedResult = (
+    strategy: CrawlStrategy,
+    result: CrawlResult,
+    rejectReason: string
+  ): CrawlResult | null => {
+    if (isResultAcceptable(result, options)) {
+      recordAttempt({ strategy, ok: true })
+      return result
+    }
+
+    recordRejectedAttempt(strategy, rejectReason)
+    return null
+  }
 
   if (enableFetch) {
     try {
       const { html } = await fetchHtml(url, options, headers)
       fetchedHtml = html
       const result = extractFromHtml(url, html, 'fetch')
-
-      if (isResultAcceptable(result, options)) {
-        attempts.push({ strategy: 'fetch', ok: true })
-        return result
+      const accepted = getAcceptedResult(
+        'fetch',
+        result,
+        'Fetch result did not meet acceptance thresholds'
+      )
+      if (accepted) {
+        return accepted
       }
-
-      attempts.push({
-        strategy: 'fetch',
-        ok: false,
-        reason: 'Fetch result did not meet acceptance thresholds',
-      })
     } catch (error) {
-      attempts.push({
-        strategy: 'fetch',
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      recordFailedAttempt('fetch', error)
     }
   }
 
   if (enableJsdom) {
     try {
       const html = fetchedHtml ?? (await fetchHtml(url, options, headers)).html
-      const renderedHtml = await renderWithJsdom(url, html, options)
+      const renderedHtml = await renderWithJsdom(url, html, options, headers['User-Agent'])
       const result = extractFromHtml(url, renderedHtml, 'jsdom')
-
-      if (isResultAcceptable(result, options)) {
-        attempts.push({ strategy: 'jsdom', ok: true })
-        return result
+      const accepted = getAcceptedResult(
+        'jsdom',
+        result,
+        'jsdom render did not meet acceptance thresholds'
+      )
+      if (accepted) {
+        return accepted
       }
-
-      attempts.push({
-        strategy: 'jsdom',
-        ok: false,
-        reason: 'jsdom render did not meet acceptance thresholds',
-      })
     } catch (error) {
-      attempts.push({
-        strategy: 'jsdom',
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      recordFailedAttempt('jsdom', error)
     }
   }
 
   if (enablePlaywright) {
     try {
       const result = await withPlaywright(url, options, headers)
-      if (isResultAcceptable(result, options)) {
-        attempts.push({ strategy: 'playwright', ok: true })
-        return result
+      const accepted = getAcceptedResult(
+        'playwright',
+        result,
+        'Playwright result did not meet acceptance thresholds'
+      )
+      if (accepted) {
+        return accepted
       }
-
-      attempts.push({
-        strategy: 'playwright',
-        ok: false,
-        reason: 'Playwright result did not meet acceptance thresholds',
-      })
     } catch (error) {
-      attempts.push({
-        strategy: 'playwright',
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      recordFailedAttempt('playwright', error)
     }
   }
 
   if (enableScrapeDo) {
     try {
-      const result = await withScrapeDo(url, options, headers)
-      if (isResultAcceptable(result, options)) {
-        attempts.push({ strategy: 'scrapeDo', ok: true })
-        return result
+      const result = await withScrapeDo(url, options)
+      const accepted = getAcceptedResult(
+        'scrapeDo',
+        result,
+        'Scrape.do result did not meet acceptance thresholds'
+      )
+      if (accepted) {
+        return accepted
       }
-
-      attempts.push({
-        strategy: 'scrapeDo',
-        ok: false,
-        reason: 'Scrape.do result did not meet acceptance thresholds',
-      })
     } catch (error) {
-      attempts.push({
-        strategy: 'scrapeDo',
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      recordFailedAttempt('scrapeDo', error)
     }
   }
 
@@ -514,6 +540,7 @@ export async function crawl(url: string, options: CrawlOptions = {}): Promise<Cr
  */
 export async function closeBrowser(): Promise<void> {
   contextInit = null
+  contextHeadersKey = null
   if (browser) {
     await browser.close()
     browser = null
