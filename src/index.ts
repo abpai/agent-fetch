@@ -437,14 +437,8 @@ export async function crawl(url: string, options: CrawlOptions = {}): Promise<Cr
 
   const headers = buildHeaders(options)
   let fetchedHtml: string | null = null
-  const recordAttempt = (attempt: CrawlAttempt) => {
-    attempts.push(attempt)
-  }
-  const recordRejectedAttempt = (strategy: CrawlStrategy, reason: string) => {
-    recordAttempt({ strategy, ok: false, reason })
-  }
   const recordFailedAttempt = (strategy: CrawlStrategy, error: unknown) => {
-    recordAttempt({
+    attempts.push({
       strategy,
       ok: false,
       error: error instanceof Error ? error.message : String(error),
@@ -456,11 +450,11 @@ export async function crawl(url: string, options: CrawlOptions = {}): Promise<Cr
     rejectReason: string
   ): CrawlResult | null => {
     if (isResultAcceptable(result, options)) {
-      recordAttempt({ strategy, ok: true })
+      attempts.push({ strategy, ok: true })
       return result
     }
 
-    recordRejectedAttempt(strategy, rejectReason)
+    attempts.push({ strategy, ok: false, reason: rejectReason })
     return null
   }
 
