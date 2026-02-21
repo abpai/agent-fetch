@@ -63,35 +63,6 @@ Order of attempts:
 
 If an attempt does not meet acceptance thresholds (length/word count or blocked-page heuristics), it falls back to the next strategy. If all attempts fail, `crawl()` throws a `CrawlError` with per-strategy details.
 
-## URL Queue CLI
-
-Build a prioritized queue from browser history JSON files:
-
-```bash
-pnpm run queue:generate
-```
-
-Input files are read from `data/`:
-
-- `*.json` browser history exports (required)
-- `blacklist_domains.txt` domain suffixes to block (optional)
-- `url_filters.json` custom filter overrides (optional)
-
-The generator writes `data/url_queue.json`.
-
-Manage that queue from the command line:
-
-```bash
-pnpm run queue:stats
-pnpm run queue:list
-pnpm run queue:peek -- 5
-pnpm run queue:pop -- 10
-node scripts/queue-cli.mjs enqueue https://example.com/article "Manual add"
-node scripts/queue-cli.mjs remove https://example.com/article
-```
-
-See `ARCHITECTURE.md` for flow details.
-
 ## Codex App Server Mode (R2 Artifacts)
 
 Run `codex app-server` on the crawl host (for example, Raspberry Pi), then use shell commands to crawl and upload raw content to Cloudflare R2.
@@ -156,7 +127,7 @@ aws s3 cp /tmp/crawl/$ARTIFACT_ID.html s3://$R2_BUCKET/crawl/$ARTIFACT_ID.html \
 
 Configure lifecycle rules on the bucket to auto-expire objects after your desired TTL.
 
-## Use in a Queue Worker
+## Use in a Worker
 
 ```typescript
 import { crawl, closeBrowser } from 'crawl'

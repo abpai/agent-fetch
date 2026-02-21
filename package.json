@@ -17,11 +17,6 @@
     "test": "vitest",
     "format": "prettier --write .",
     "lint": "eslint .",
-    "queue:generate": "pnpm exec tsx scripts/url-history.ts",
-    "queue:stats": "node scripts/queue-cli.mjs stats",
-    "queue:list": "node scripts/queue-cli.mjs list",
-    "queue:peek": "node scripts/queue-cli.mjs peek",
-    "queue:pop": "node scripts/queue-cli.mjs pop",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
@@ -41,7 +36,6 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^16.2.0",
     "prettier": "^3.5.3",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vitest": "^3.1.4"
