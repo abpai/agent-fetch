@@ -111,6 +111,27 @@ const DEFAULT_BLOCKED_PATTERNS: RegExp[] = [
   /verify you are/i,
 ]
 
+/**
+ * Text signals that indicate a paywall is preventing content access.
+ * Checked against the fetched title + markdown regardless of word count,
+ * since metered paywalls often render a full teaser before the gate.
+ */
+const PAYWALL_TEXT_SIGNALS: RegExp[] = [
+  /subscribe to continue reading/i,
+  /this article is for subscribers/i,
+  /you['']ve reached your (free )?article limit/i,
+  /unlock this story/i,
+  /member[- ]only content/i,
+  /subscribe for unlimited access/i,
+  /create a free account to (read|continue)/i,
+  /sign up to read/i,
+  /paywall/i,
+  /subscriber exclusive/i,
+  /already a subscriber\? (log|sign) in/i,
+  /get unlimited access/i,
+  /read the full (article|story) with a subscription/i,
+]
+
 const turndown = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
@@ -181,6 +202,8 @@ const normalizePatterns = (patterns: Array<string | RegExp> | undefined): RegExp
   return patterns.map((pattern) => (typeof pattern === 'string' ? new RegExp(pattern, 'i') : pattern))
 }
 
+const buildTextHaystack = (result: CrawlResult): string => `${result.title}\n${result.markdown}`
+
 const isLikelyBlocked = (result: CrawlResult, options: CrawlOptions): boolean => {
   const threshold = options.blockedWordCountThreshold ?? DEFAULT_BLOCKED_WORD_COUNT_THRESHOLD
   if (result.wordCount >= threshold) {
@@ -188,9 +211,19 @@ const isLikelyBlocked = (result: CrawlResult, options: CrawlOptions): boolean =>
   }
 
   const patterns = normalizePatterns(options.blockedTextPatterns)
-  const haystack = `${result.title}\n${result.markdown}`.toLowerCase()
+  const haystack = buildTextHaystack(result).toLowerCase()
 
   return patterns.some((pattern) => pattern.test(haystack))
+}
+
+/**
+ * Detect metered/soft paywalls by inspecting fetched content for subscription
+ * prompts. Unlike bot-check detection, paywall signals are checked regardless
+ * of word count — a paywalled page may render substantial teaser text.
+ */
+const isLikelyPaywalled = (result: CrawlResult): boolean => {
+  const haystack = buildTextHaystack(result)
+  return PAYWALL_TEXT_SIGNALS.some((pattern) => pattern.test(haystack))
 }
 
 const isResultAcceptable = (result: CrawlResult, options: CrawlOptions): boolean => {
@@ -208,6 +241,9 @@ const isResultAcceptable = (result: CrawlResult, options: CrawlOptions): boolean
     return false
   }
   if (isLikelyBlocked(result, options)) {
+    return false
+  }
+  if (isLikelyPaywalled(result)) {
     return false
   }
 
