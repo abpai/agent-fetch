@@ -17,6 +17,8 @@ Authenticated mode is explicit: `--with-credentials` jumps straight to `agent-br
 bun add @andypai/agent-fetch
 ```
 
+`agent-fetch` is Bun-only. Use Bun for install, runtime, tests, and local tooling. Node.js and other package managers are not supported.
+
 ## CLI
 
 ### Fetch
@@ -46,8 +48,21 @@ agent-fetch fetch https://example.com --strategy authenticated
 agent-fetch setup
 
 # Non-interactive setup from env vars
-AGENT_FETCH_CDP_PORT=9222 agent-fetch setup --no-input --overwrite
+AGENT_FETCH_TIMEOUT=45000 \
+AGENT_FETCH_ENABLE_PLUGINS=true \
+SCRAPEDO_TOKEN=your-token \
+AGENT_FETCH_ENABLE_AGENT_BROWSER=true \
+AGENT_FETCH_CDP_PORT=9222 \
+agent-fetch setup --no-input --overwrite
 ```
+
+The setup walkthrough can now configure:
+
+- default strategy mode
+- timeout and content validation thresholds
+- fetch/jsdom/plugin/agent-browser fallbacks
+- optional scrape.do plugin wiring
+- authenticated browser CDP defaults
 
 ### Plugins
 
@@ -66,6 +81,8 @@ Default shared env path:
 
 - `~/.config/agent-fetch/.env`
 
+The config file stores runtime defaults. The shared env file stores machine-specific values and secrets such as `AGENT_FETCH_CDP_PORT`, `AGENT_FETCH_CDP_LAUNCH`, and `SCRAPEDO_TOKEN`.
+
 Example config:
 
 ```json
@@ -79,14 +96,19 @@ Example config:
   "plugins": [
     {
       "type": "scrape-do",
-      "token": "${SCRAPEDO_TOKEN}",
-      "params": { "render": true }
+      "token": "${SCRAPEDO_TOKEN}"
     }
   ],
-  "agentBrowser": {
-    "cdpPort": "9222"
-  }
+  "waitForNetworkIdle": false
 }
+```
+
+Example shared env file:
+
+```bash
+AGENT_FETCH_CDP_PORT=9222
+AGENT_FETCH_CDP_LAUNCH='open -na "Google Chrome" --args --remote-debugging-port=9222'
+SCRAPEDO_TOKEN=your-token
 ```
 
 ### Legacy config behavior
@@ -97,6 +119,24 @@ Legacy config files are now rejected with a hard error:
 - `fetch.config.json`
 
 Move settings to `~/.config/agent-fetch/config.json`.
+
+### Supported setup env vars
+
+- `AGENT_FETCH_TIMEOUT`
+- `AGENT_FETCH_ENABLE_FETCH`
+- `AGENT_FETCH_ENABLE_JSDOM`
+- `AGENT_FETCH_ENABLE_PLUGINS`
+- `AGENT_FETCH_ENABLE_AGENT_BROWSER`
+- `AGENT_FETCH_STRATEGY_MODE`
+- `AGENT_FETCH_WAIT_FOR_NETWORK_IDLE`
+- `AGENT_FETCH_USER_AGENT`
+- `AGENT_FETCH_MIN_HTML_LENGTH`
+- `AGENT_FETCH_MIN_MARKDOWN_LENGTH`
+- `AGENT_FETCH_MIN_WORD_COUNT`
+- `AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD`
+- `AGENT_FETCH_CDP_PORT`
+- `AGENT_FETCH_CDP_LAUNCH`
+- `SCRAPEDO_TOKEN`
 
 ## Library usage
 

@@ -278,19 +278,34 @@ The server reads JSON-RPC from stdin and writes responses/notifications to stdou
 Send (paste into stdin, press Enter):
 
 ```json
-{"method":"initialize","id":1,"params":{"clientInfo":{"name":"manual-test","title":"Manual Test","version":"0.1.0"},"capabilities":{"experimentalApi":true}}}
+{
+  "method": "initialize",
+  "id": 1,
+  "params": {
+    "clientInfo": { "name": "manual-test", "title": "Manual Test", "version": "0.1.0" },
+    "capabilities": { "experimentalApi": true }
+  }
+}
 ```
 
 You'll get back a response with `"id":1` and a result object. Then send the `initialized` notification:
 
 ```json
-{"method":"initialized"}
+{ "method": "initialized" }
 ```
 
 ### 11c. Start a thread
 
 ```json
-{"method":"thread/start","id":2,"params":{"cwd":"/Users/andypai/Projects/crawl","approvalPolicy":"never","sandbox":"danger-full-access"}}
+{
+  "method": "thread/start",
+  "id": 2,
+  "params": {
+    "cwd": "/Users/andypai/Projects/crawl",
+    "approvalPolicy": "never",
+    "sandbox": "danger-full-access"
+  }
+}
 ```
 
 You'll receive a `thread/started` notification and a response with `thread.id`. Note the `threadId` value (e.g., `"thr_abc123"`).
@@ -300,10 +315,23 @@ You'll receive a `thread/started` notification and a response with `thread.id`. 
 Send a turn with the thread ID from step 11c:
 
 ```json
-{"method":"turn/start","id":3,"params":{"threadId":"THREAD_ID_HERE","input":[{"type":"text","text":"Run `agent-fetch fetch https://example.com --json` and show me the title and word count from the output."}]}}
+{
+  "method": "turn/start",
+  "id": 3,
+  "params": {
+    "threadId": "THREAD_ID_HERE",
+    "input": [
+      {
+        "type": "text",
+        "text": "Run `agent-fetch fetch https://example.com --json` and show me the title and word count from the output."
+      }
+    ]
+  }
+}
 ```
 
 You'll see streaming notifications:
+
 - `item/started` — agent begins reasoning
 - `item/agentMessage/delta` — text chunks from the agent
 - `item/started` with `type: "commandExecution"` — agent runs the command
@@ -315,19 +343,55 @@ You'll see streaming notifications:
 Test SKILL.md discovery — ask about available strategies:
 
 ```json
-{"method":"turn/start","id":4,"params":{"threadId":"THREAD_ID_HERE","input":[{"type":"text","text":"Read SKILL.md and then run `agent-fetch fetch https://news.ycombinator.com --strategy simple --json --debug-attempts`. Show the strategy used and any attempt details."}]}}
+{
+  "method": "turn/start",
+  "id": 4,
+  "params": {
+    "threadId": "THREAD_ID_HERE",
+    "input": [
+      {
+        "type": "text",
+        "text": "Read SKILL.md and then run `agent-fetch fetch https://news.ycombinator.com --strategy simple --json --debug-attempts`. Show the strategy used and any attempt details."
+      }
+    ]
+  }
+}
 ```
 
 Test authenticated mode:
 
 ```json
-{"method":"turn/start","id":5,"params":{"threadId":"THREAD_ID_HERE","input":[{"type":"text","text":"Run `agent-fetch fetch https://example.com --with-credentials --json` and report whether it succeeded or failed."}]}}
+{
+  "method": "turn/start",
+  "id": 5,
+  "params": {
+    "threadId": "THREAD_ID_HERE",
+    "input": [
+      {
+        "type": "text",
+        "text": "Run `agent-fetch fetch https://example.com --with-credentials --json` and report whether it succeeded or failed."
+      }
+    ]
+  }
+}
 ```
 
 Test plugin listing:
 
 ```json
-{"method":"turn/start","id":6,"params":{"threadId":"THREAD_ID_HERE","input":[{"type":"text","text":"Run `agent-fetch plugins list --json` and summarize the available plugins."}]}}
+{
+  "method": "turn/start",
+  "id": 6,
+  "params": {
+    "threadId": "THREAD_ID_HERE",
+    "input": [
+      {
+        "type": "text",
+        "text": "Run `agent-fetch plugins list --json` and summarize the available plugins."
+      }
+    ]
+  }
+}
 ```
 
 ### 11f. Direct command execution (no thread)
@@ -335,7 +399,14 @@ Test plugin listing:
 You can also run commands directly without a thread context:
 
 ```json
-{"method":"command/exec","id":7,"params":{"command":["agent-fetch","fetch","https://example.com","--json"],"cwd":"/Users/andypai/Projects/crawl"}}
+{
+  "method": "command/exec",
+  "id": 7,
+  "params": {
+    "command": ["agent-fetch", "fetch", "https://example.com", "--json"],
+    "cwd": "/Users/andypai/Projects/crawl"
+  }
+}
 ```
 
 This returns stdout, stderr, and exitCode directly.
