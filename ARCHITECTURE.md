@@ -2,104 +2,84 @@
 
 ## Purpose
 
-`crawl` is a resilient web-content extraction library that crawls a URL and returns high-signal markdown plus metadata using a fallback chain.
+`agent-fetch` is a CLI-first fetch tool for AI agents.
 
-## Component Map
+It prioritizes low-cost extraction first and escalates only when needed, while keeping behavior scriptable and explicit.
+
+## Primary Interface
+
+- CLI binary: `agent-fetch`
+- Core command: `agent-fetch fetch <url>`
+- Supporting commands: `agent-fetch setup`, `agent-fetch plugins list`
+
+## Strategy Modes
+
+- `auto` (default): `fetch -> jsdom -> plugins -> agent-browser`
+- `simple`: `fetch` only
+- `authenticated`: `agent-browser` only (same behavior as `--with-credentials`)
+
+## Authenticated Fast Path
+
+When `--with-credentials` is passed, `agent-fetch` skips all non-authenticated stages and directly runs `agent-browser` with CDP credentials.
+
+If that fails, command exits non-zero with actionable error details and does not silently downgrade.
+
+## Config and Environment
+
+Config files:
+
+- `~/.config/agent-fetch/config.json`
+- optional override: `--config <path>` or `AGENT_FETCH_CONFIG_PATH`
+
+Shared env file:
+
+- `~/.config/agent-fetch/.env`
+- optional override: `AGENT_FETCH_SHARED_ENV_PATH`
+
+Credential keys:
+
+- `AGENT_FETCH_CDP_PORT` (required for authenticated mode)
+- `AGENT_FETCH_CDP_LAUNCH` (optional fallback launcher)
+
+Legacy files are hard-rejected:
+
+- `.fetchrc.json`
+- `fetch.config.json`
+
+## Module Map
 
 - `src/index.ts`
-  - Public API: `crawl(url, options)` and `closeBrowser()`
-  - Strategy pipeline: `fetch -> jsdom -> playwright -> scrapeDo`
-  - Shared extraction: `extractFromHtml()` using Readability + Turndown
-  - Acceptance gate: `isResultAcceptable()` + blocked-page heuristics
-- `src/index.test.ts`
-  - Behavioral tests for strategy order, skipping disabled steps, and `CrawlError` attempts payload
+  - Bun entrypoint
+  - exports CLI and library API
+- `src/cli/index.ts`
+  - command parsing (`fetch`, `setup`, `plugins list`)
+- `src/cli/commands/fetch.ts`
+  - runtime config + fetch engine execution
+- `src/cli/commands/setup.ts`
+  - guided/non-interactive setup for CDP credentials and defaults
+- `src/cli/commands/plugins.ts`
+  - built-in plugin discovery output
+- `src/core/fetch-engine.ts`
+  - strategy orchestration and attempt tracking
+- `src/core/acceptance.ts`
+  - threshold + blocked/paywall checks
+- `src/core/extract.ts`
+  - Readability + Turndown extraction
+- `src/strategies/`
+  - `fetch.ts`, `jsdom.ts`, `agent-browser.ts`
+- `src/plugins/`
+  - built-ins, registry, plugin interfaces
+- `src/config/loader.ts`
+  - config discovery, env merging, legacy detection
 
-## End-to-End Flow
+## Error Model
 
-```mermaid
-flowchart LR
-    A[Worker] --> B["crawl(url)"]
-    B --> C[CrawlResult]
-```
+- Fetch failures throw `FetchError` with per-strategy `attempts[]`.
+- CLI prints actionable errors to `stderr` and returns non-zero exit.
+- `stdout` remains reserved for primary output (markdown or JSON).
 
-## Crawl Code Flow
+## Plugin Model (v1)
 
-`crawl()` in `src/index.ts` builds headers, evaluates enabled strategies, and records each attempt in an `attempts` array. The first acceptable result returns immediately; if all enabled strategies fail, `crawl()` throws `CrawlError` with full attempt details.
-
-```mermaid
-flowchart TD
-    A[crawl(url, options)] --> B[buildHeaders]
-    B --> C[attempts = []]
-    C --> D{fetch enabled}
-    D -->|yes| E[fetchHtml + extractFromHtml]
-    D -->|no| I
-    E --> F{isResultAcceptable}
-    F -->|yes| G[attempts += fetch ok]
-    G --> H[return CrawlResult strategy=fetch]
-    F -->|no| I[jsdom step]
-    I --> J{jsdom enabled}
-    J -->|yes| K[renderWithJsdom + extractFromHtml]
-    J -->|no| N
-    K --> L{isResultAcceptable}
-    L -->|yes| M[return CrawlResult strategy=jsdom]
-    L -->|no| N[playwright step]
-    N --> O{playwright enabled}
-    O -->|yes| P[withPlaywright + extractFromHtml]
-    O -->|no| S
-    P --> Q{isResultAcceptable}
-    Q -->|yes| R[return CrawlResult strategy=playwright]
-    Q -->|no| S[scrape.do step]
-    S --> T{scrape.do enabled}
-    T -->|yes| U[withScrapeDo + extractFromHtml]
-    T -->|no| X
-    U --> V{isResultAcceptable}
-    V -->|yes| W[return CrawlResult strategy=scrapeDo]
-    V -->|no| X[throw CrawlError with attempts]
-```
-
-## Acceptance and Failure Model
-
-Each strategy result is accepted only when all checks pass:
-
-- `html.trim().length >= minHtmlLength`
-- `markdown.trim().length >= minMarkdownLength`
-- `wordCount >= minWordCount`
-- `isLikelyBlocked(...) === false`
-
-If an attempt fails, `attempts[]` stores either:
-
-- `reason` for threshold rejection, or
-- `error` for thrown exceptions (HTTP error, timeout, browser error, etc.)
-
-This makes fallback behavior observable and debuggable in production workers.
-
-## Playwright Context Lifecycle
-
-Playwright is pooled and reused when headers are unchanged; context is recreated when header/user-agent shape changes.
-
-```mermaid
-flowchart TD
-    A[withPlaywright(url, options, headers)] --> B[getBrowser(headers)]
-    B --> C[Compute headers key]
-    C --> D{Existing context key matches}
-    D -->|yes| E[Reuse context]
-    D -->|no| F{Context init in progress}
-    F -->|yes| G[Await init, re-check key]
-    F -->|no| H[Launch browser if needed]
-    H --> I[Close prior context if present]
-    I --> J[newContext with userAgent + extraHTTPHeaders]
-    J --> E
-    E --> K[newPage]
-    K --> L{blockResources}
-    L -->|yes| M[Abort image/media/font requests]
-    L -->|no| N[Continue all]
-    M --> O[page.goto + wait strategy]
-    N --> O
-    O --> P[page.content -> extractFromHtml]
-    P --> Q[page.close]
-    Q --> R[return CrawlResult]
-```
-
-## Operational Notes
-
-- `closeBrowser()` should be called on shutdown to release Playwright resources.
+- Built-ins + local register API only (`registerPlugin`)
+- No dynamic npm plugin auto-loading
+- Plugin config supports `${ENV_VAR}` interpolation

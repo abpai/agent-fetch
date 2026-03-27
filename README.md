@@ -1,150 +1,157 @@
-# crawl
+# agent-fetch
 
-A small scraping package that extracts clean markdown from URLs with a smart fallback chain.
+`agent-fetch` is a robust fetch CLI for AI agents.
 
-## Installation
+It tries the cheapest strategy first, then escalates when needed:
 
-```bash
-pnpm add crawl
-```
+1. `fetch`
+2. `jsdom`
+3. configured plugins
+4. `agent-browser`
 
-Note: Playwright requires browser binaries. Install them with:
+Authenticated mode is explicit: `--with-credentials` jumps straight to `agent-browser` and fails fast if credentials are missing or invalid.
 
-```bash
-pnpm exec playwright install chromium
-```
-
-## Usage
-
-```typescript
-import { crawl, closeBrowser } from 'crawl'
-
-const result = await crawl('https://example.com')
-
-console.log(result.title)    // Page title
-console.log(result.markdown) // Clean markdown content
-console.log(result.html)     // Raw HTML
-console.log(result.author)   // Author if detected
-console.log(result.wordCount)
-console.log(result.strategy) // fetch | jsdom | playwright | scrapeDo
-
-// When done with all crawling:
-await closeBrowser()
-```
-
-## Options
-
-```typescript
-await crawl(url, {
-  timeout: 30000,           // Page load timeout (default: 30s)
-  waitForNetworkIdle: true, // Wait for network idle (default: true)
-  enableFetch: true,        // Try fetch first (default: true)
-  enableJsdom: false,       // jsdom JS render step (default: false)
-  enablePlaywright: true,   // Playwright fallback (default: true)
-  enableScrapeDo: false,    // Scrape.do fallback (default: false unless token provided)
-  scrapeDo: {
-    token: process.env.SCRAPEDO_TOKEN!,
-    endpoint: 'https://api.scrape.do',
-    params: { render: 'true' },
-  },
-  minMarkdownLength: 100,   // Acceptance thresholds
-  minWordCount: 20,
-})
-```
-
-## How It Works
-
-Order of attempts:
-
-1) `fetch()` with realistic headers
-2) jsdom render (optional)
-3) Playwright (optional)
-4) Scrape.do (optional)
-
-If an attempt does not meet acceptance thresholds (length/word count or blocked-page heuristics), it falls back to the next strategy. If all attempts fail, `crawl()` throws a `CrawlError` with per-strategy details.
-
-## Codex App Server Mode (R2 Artifacts)
-
-Run `codex app-server` on the crawl host (for example, Raspberry Pi), then use shell commands to crawl and upload raw content to Cloudflare R2.
-
-Default goal: return artifact metadata, not full page bodies, unless explicitly requested.
-
-### Recommended Instruction Split
-
-- `AGENTS.md`: policy and defaults for this repo/session.
-- `SKILL.md`: operational command workflow for crawl jobs.
-- App server developer instructions: short, global behavior only.
-
-Use `AGENTS.md` for behavior policy. Keep exact command steps in `SKILL.md`.
-
-### Cloudflare R2 Notes
-
-- You do not need a long-running Cloudflare CLI process.
-- `wrangler` is optional for setup/admin tasks.
-- Runtime uploads can use S3-compatible APIs (`aws s3 cp`, SDKs, or a small script).
-
-Suggested env vars on the crawl host:
-
-- `R2_ACCOUNT_ID`
-- `R2_BUCKET`
-- `R2_ACCESS_KEY_ID`
-- `R2_SECRET_ACCESS_KEY`
-
-### Example `AGENTS.md` Instructions (App Server Mode)
-
-```md
-## Crawl Artifact Policy (App Server Mode)
-
-When a user asks to crawl a URL, run the crawl locally via shell on this host.
-
-Default output mode is `artifact`:
-1. Save raw content to a temp file.
-2. Compute `sha256` and byte size.
-3. Upload raw file to Cloudflare R2.
-4. Return metadata only:
-   - `artifact_id`
-   - `bucket`
-   - `key`
-   - `bytes`
-   - `sha256`
-   - `expires_at`
-   - `signed_url` (or retrieval command)
-
-Only inline full raw content when the prompt explicitly asks for `raw-inline`.
-
-If prompt asks for `raw`, return artifact metadata plus retrieval info.
-If prompt asks for `summary` or `extract`, operate from crawled content, keep response concise, and include artifact metadata for traceability.
-
-Never store credentials in repo files. Read R2 credentials from environment variables.
-```
-
-### Example Runtime Upload Command
+## Install
 
 ```bash
-aws s3 cp /tmp/crawl/$ARTIFACT_ID.html s3://$R2_BUCKET/crawl/$ARTIFACT_ID.html \
-  --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
+bun add @andypai/agent-fetch
 ```
 
-Configure lifecycle rules on the bucket to auto-expire objects after your desired TTL.
+## CLI
 
-## Use in a Worker
+### Fetch
 
-```typescript
-import { crawl, closeBrowser } from 'crawl'
+```bash
+# Markdown output (default)
+agent-fetch fetch https://example.com
 
-async function processJob(url: string) {
-  const result = await crawl(url)
-  // Store result in your database
-  return result
+# JSON output
+agent-fetch fetch https://example.com --json
+
+# Disable fallback stages
+agent-fetch fetch https://example.com --no-jsdom --no-plugins
+
+# Authenticated fast path (agent-browser only)
+agent-fetch fetch https://example.com --with-credentials
+
+# Force strategy mode
+agent-fetch fetch https://example.com --strategy simple
+agent-fetch fetch https://example.com --strategy authenticated
+```
+
+### Setup
+
+```bash
+# Guided setup
+agent-fetch setup
+
+# Non-interactive setup from env vars
+AGENT_FETCH_CDP_PORT=9222 agent-fetch setup --no-input --overwrite
+```
+
+### Plugins
+
+```bash
+agent-fetch plugins list
+agent-fetch plugins list --json
+```
+
+## Configuration
+
+Default config path:
+
+- `~/.config/agent-fetch/config.json`
+
+Default shared env path:
+
+- `~/.config/agent-fetch/.env`
+
+Example config:
+
+```json
+{
+  "timeout": 30000,
+  "enableFetch": true,
+  "enableJsdom": true,
+  "enablePlugins": true,
+  "enableAgentBrowser": true,
+  "strategyMode": "auto",
+  "plugins": [
+    {
+      "type": "scrape-do",
+      "token": "${SCRAPEDO_TOKEN}",
+      "params": { "render": true }
+    }
+  ],
+  "agentBrowser": {
+    "cdpPort": "9222"
+  }
 }
-
-// Clean up on shutdown
-process.on('SIGTERM', async () => {
-  await closeBrowser()
-  process.exit(0)
-})
 ```
 
-## License
+### Legacy config behavior
 
-MIT
+Legacy config files are now rejected with a hard error:
+
+- `.fetchrc.json`
+- `fetch.config.json`
+
+Move settings to `~/.config/agent-fetch/config.json`.
+
+## Library usage
+
+```ts
+import { fetchUrl } from '@andypai/agent-fetch'
+
+const result = await fetchUrl('https://example.com', {
+  strategyMode: 'auto',
+})
+
+console.log(result.strategy)
+console.log(result.markdown)
+```
+
+## Output contract (`--json`)
+
+```json
+{
+  "url": "string",
+  "title": "string",
+  "author": "string | null",
+  "markdown": "string",
+  "html": "string",
+  "wordCount": 123,
+  "strategy": "fetch | jsdom | plugin-name | agent-browser",
+  "fetchedAt": "ISO-8601",
+  "attempts": [
+    {
+      "strategy": "fetch",
+      "ok": true,
+      "durationMs": 120
+    }
+  ]
+}
+```
+
+## Development
+
+```bash
+bun install
+bun run build
+bun run check
+bun run test
+```
+
+### Scripts
+
+```bash
+bun run dev        # run with watch mode
+bun run start      # run once
+bun run build      # bun build ./src/index.ts --target bun --outdir ./dist
+bun run format     # prettier write
+bun run lint       # eslint
+bun run typecheck  # tsc --noEmit
+bun run test       # bun test src
+bun run test:watch # bun test --watch src
+bun run check      # prettier check + lint + typecheck + test
+```
