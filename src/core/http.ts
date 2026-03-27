@@ -19,7 +19,7 @@ const DEFAULT_HEADERS: Record<string, string> = {
 
 export const buildHeaders = (
   options: Pick<FetchOptions, 'headers' | 'userAgent'>,
-  overrides?: Record<string, string>
+  overrides?: Record<string, string>,
 ): Record<string, string> => {
   const headers: Record<string, string> = {
     ...DEFAULT_HEADERS,
@@ -40,7 +40,10 @@ export const buildHeaders = (
 
 export const createTimeoutSignal = (timeoutMs: number) => {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(new Error('Request timed out')), timeoutMs)
+  const timeout = setTimeout(
+    () => controller.abort(new Error('Request timed out')),
+    timeoutMs,
+  )
 
   return {
     signal: controller.signal,

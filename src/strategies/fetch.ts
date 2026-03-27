@@ -3,9 +3,10 @@ import type { FetchEngineContext } from '../core/types.js'
 
 export const runFetchStrategy = async (
   url: string,
-  context: FetchEngineContext
+  context: FetchEngineContext,
 ): Promise<string> => {
-  const timeoutMs = context.options.fetchTimeout ?? context.options.timeout ?? DEFAULT_TIMEOUT_MS
+  const timeoutMs =
+    context.options.fetchTimeout ?? context.options.timeout ?? DEFAULT_TIMEOUT_MS
   const { signal, clear } = createTimeoutSignal(timeoutMs)
 
   try {

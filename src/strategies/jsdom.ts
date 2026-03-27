@@ -5,9 +5,10 @@ import type { FetchEngineContext } from '../core/types.js'
 export const runJsdomStrategy = async (
   url: string,
   html: string,
-  context: FetchEngineContext
+  context: FetchEngineContext,
 ): Promise<string> => {
-  const timeoutMs = context.options.jsdomTimeout ?? context.options.timeout ?? DEFAULT_TIMEOUT_MS
+  const timeoutMs =
+    context.options.jsdomTimeout ?? context.options.timeout ?? DEFAULT_TIMEOUT_MS
   const virtualConsole = new VirtualConsole()
   virtualConsole.on('error', () => undefined)
 
@@ -16,7 +17,8 @@ export const runJsdomStrategy = async (
     runScripts: 'dangerously',
     resources: 'usable',
     pretendToBeVisual: true,
-    userAgent: context.options.userAgent || context.headers['User-Agent'] || DEFAULT_USER_AGENT,
+    userAgent:
+      context.options.userAgent || context.headers['User-Agent'] || DEFAULT_USER_AGENT,
     virtualConsole,
   })
 
@@ -34,7 +36,7 @@ export const runJsdomStrategy = async (
           clearTimeout(timeout)
           resolve()
         },
-        { once: true }
+        { once: true },
       )
     })
 

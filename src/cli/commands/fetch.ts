@@ -4,12 +4,18 @@ import { FetchError } from '../../core/types.js'
 import type { StrategyMode } from '../../core/types.js'
 import type { FetchCommand } from '../types.js'
 
-export interface FetchCommandDependencies {
+interface FetchCommandDependencies {
   output: (message: string) => void
   error: (message: string) => void
 }
 
-const renderAttempt = (attempt: { strategy: string; ok: boolean; reason?: string; error?: string; durationMs: number }): string => {
+const renderAttempt = (attempt: {
+  strategy: string
+  ok: boolean
+  reason?: string
+  error?: string
+  durationMs: number
+}): string => {
   if (attempt.ok) {
     return `${attempt.strategy}: ok (${attempt.durationMs}ms)`
   }
@@ -23,7 +29,7 @@ const renderAttempt = (attempt: { strategy: string; ok: boolean; reason?: string
 
 export const runFetchCommand = async (
   command: FetchCommand,
-  dependencies: FetchCommandDependencies
+  dependencies: FetchCommandDependencies,
 ): Promise<number> => {
   try {
     let strategyMode: StrategyMode = command.strategy
@@ -33,7 +39,7 @@ export const runFetchCommand = async (
 
     if (strategyMode === 'authenticated' && command.noAgentBrowser) {
       dependencies.error(
-        '`authenticated` mode cannot be combined with `--no-agent-browser`.'
+        '`authenticated` mode cannot be combined with `--no-agent-browser`.',
       )
       return 2
     }
@@ -44,7 +50,9 @@ export const runFetchCommand = async (
       ...runtime.config,
       enableJsdom: command.noJsdom ? false : (runtime.config.enableJsdom ?? true),
       enablePlugins: command.noPlugins ? false : (runtime.config.enablePlugins ?? true),
-      enableAgentBrowser: command.noAgentBrowser ? false : (runtime.config.enableAgentBrowser ?? true),
+      enableAgentBrowser: command.noAgentBrowser
+        ? false
+        : (runtime.config.enableAgentBrowser ?? true),
       timeout: command.timeout ?? runtime.config.timeout,
       withCredentials: command.withCredentials,
       strategyMode,
@@ -70,8 +78,8 @@ export const runFetchCommand = async (
             attempts: result.attempts,
           },
           null,
-          2
-        )
+          2,
+        ),
       )
     } else {
       dependencies.output(result.markdown)

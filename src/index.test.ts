@@ -37,7 +37,8 @@ process.exit(0)
   return scriptPath
 }
 
-const largeWordBlob = (count: number): string => Array.from({ length: count }, () => 'word').join(' ')
+const largeWordBlob = (count: number): string =>
+  Array.from({ length: count }, () => 'word').join(' ')
 
 describe('agent-fetch engine', () => {
   beforeAll(() => {
@@ -76,8 +77,9 @@ describe('agent-fetch engine', () => {
     expect(result.strategy).toBe('fetch')
     expect(result.title).toBe('Example Domain')
     expect(result.attempts).toHaveLength(1)
-    expect(result.attempts[0].strategy).toBe('fetch')
-    expect(result.attempts[0].ok).toBe(true)
+    const [fetchAttempt] = result.attempts
+    expect(fetchAttempt?.strategy).toBe('fetch')
+    expect(fetchAttempt?.ok).toBe(true)
   })
 
   it('uses plugin fallback after fetch and jsdom fail thresholds', async () => {
@@ -97,12 +99,13 @@ describe('agent-fetch engine', () => {
     })
 
     expect(result.strategy).toBe('mock-threshold')
-    expect(result.attempts[0].strategy).toBe('fetch')
-    expect(result.attempts[0].ok).toBe(false)
-    expect(result.attempts[1].strategy).toBe('jsdom')
-    expect(result.attempts[1].ok).toBe(false)
-    expect(result.attempts[2].strategy).toBe('mock-threshold')
-    expect(result.attempts[2].ok).toBe(true)
+    const [fetchAttempt, jsdomAttempt, pluginAttempt] = result.attempts
+    expect(fetchAttempt?.strategy).toBe('fetch')
+    expect(fetchAttempt?.ok).toBe(false)
+    expect(jsdomAttempt?.strategy).toBe('jsdom')
+    expect(jsdomAttempt?.ok).toBe(false)
+    expect(pluginAttempt?.strategy).toBe('mock-threshold')
+    expect(pluginAttempt?.ok).toBe(true)
   })
 
   it('jumps directly to agent-browser in authenticated mode', async () => {
@@ -123,8 +126,9 @@ describe('agent-fetch engine', () => {
 
     expect(result.strategy).toBe('agent-browser')
     expect(result.attempts).toHaveLength(1)
-    expect(result.attempts[0].strategy).toBe('agent-browser')
-    expect(result.attempts[0].ok).toBe(true)
+    const [browserAttempt] = result.attempts
+    expect(browserAttempt?.strategy).toBe('agent-browser')
+    expect(browserAttempt?.ok).toBe(true)
   })
 
   it('fails fast when authenticated mode agent-browser fails', async () => {
@@ -144,8 +148,9 @@ describe('agent-fetch engine', () => {
       const fetchError = error as FetchError
       expect(fetchError.message).toContain('Authenticated fetch failed')
       expect(fetchError.attempts).toHaveLength(1)
-      expect(fetchError.attempts[0].strategy).toBe('agent-browser')
-      expect(fetchError.attempts[0].ok).toBe(false)
+      const [browserAttempt] = fetchError.attempts
+      expect(browserAttempt?.strategy).toBe('agent-browser')
+      expect(browserAttempt?.ok).toBe(false)
     } finally {
       delete process.env.MOCK_AGENT_BROWSER_FAIL_OPEN
     }

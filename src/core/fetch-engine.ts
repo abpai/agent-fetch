@@ -28,7 +28,7 @@ const recordErrorAttempt = (
   attempts: FetchAttempt[],
   strategy: FetchAttempt['strategy'],
   error: unknown,
-  durationMs = 0
+  durationMs = 0,
 ): void => {
   attempts.push({
     strategy,
@@ -45,9 +45,12 @@ const ensureNotSimpleFailure = (mode: StrategyMode, attempts: FetchAttempt[]): v
 }
 
 const isCredentialsMissingError = (message: string): boolean =>
-  message.includes('credentials not configured') || message.includes('Missing AGENT_FETCH_CDP_PORT')
+  message.includes('credentials not configured') ||
+  message.includes('Missing AGENT_FETCH_CDP_PORT')
 
-const timed = async <T>(fn: () => Promise<T>): Promise<{ value: T; durationMs: number }> => {
+const timed = async <T>(
+  fn: () => Promise<T>,
+): Promise<{ value: T; durationMs: number }> => {
   const start = Date.now()
   const value = await fn()
   return { value, durationMs: Date.now() - start }
@@ -65,7 +68,7 @@ const acceptedOrRejected = (
   attempts: FetchAttempt[],
   strategy: FetchAttempt['strategy'],
   durationMs: number,
-  options: FetchOptions
+  options: FetchOptions,
 ): FetchResult | null => {
   const validated = validateResult(result, options)
 
@@ -85,11 +88,14 @@ const throwAllFailed = (attempts: FetchAttempt[]): never => {
 const throwAuthenticatedFailure = (attempts: FetchAttempt[]): never => {
   throw new FetchError(
     'Authenticated fetch failed via agent-browser. Verify `agent-fetch setup` and AGENT_FETCH_CDP_PORT configuration.',
-    attempts
+    attempts,
   )
 }
 
-export const fetchUrl = async (url: string, options: FetchOptions = {}): Promise<FetchResult> => {
+export const fetchUrl = async (
+  url: string,
+  options: FetchOptions = {},
+): Promise<FetchResult> => {
   const attempts: FetchAttempt[] = []
   const mode = pickMode(options)
   const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS
@@ -117,7 +123,7 @@ export const fetchUrl = async (url: string, options: FetchOptions = {}): Promise
         attempts,
         'agent-browser',
         run.durationMs,
-        options
+        options,
       )
       if (accepted) {
         return accepted
@@ -145,7 +151,13 @@ export const fetchUrl = async (url: string, options: FetchOptions = {}): Promise
       const run = await timed(() => runFetchStrategy(url, context))
       fetchedHtml = run.value
       const extracted = extractFromHtml(url, run.value, 'fetch')
-      const accepted = acceptedOrRejected(extracted, attempts, 'fetch', run.durationMs, options)
+      const accepted = acceptedOrRejected(
+        extracted,
+        attempts,
+        'fetch',
+        run.durationMs,
+        options,
+      )
       if (accepted) {
         return accepted
       }
@@ -166,7 +178,13 @@ export const fetchUrl = async (url: string, options: FetchOptions = {}): Promise
       const html = fetchedHtml ?? (await runFetchStrategy(url, context))
       const run = await timed(() => runJsdomStrategy(url, html, context))
       const extracted = extractFromHtml(url, run.value, 'jsdom')
-      const accepted = acceptedOrRejected(extracted, attempts, 'jsdom', run.durationMs, options)
+      const accepted = acceptedOrRejected(
+        extracted,
+        attempts,
+        'jsdom',
+        run.durationMs,
+        options,
+      )
       if (accepted) {
         return accepted
       }
@@ -187,11 +205,17 @@ export const fetchUrl = async (url: string, options: FetchOptions = {}): Promise
               headers,
               timeout: timeoutMs,
               environment,
-            })
+            }),
           )
 
           const extracted = extractFromHtml(url, run.value, plugin.name)
-          const accepted = acceptedOrRejected(extracted, attempts, plugin.name, run.durationMs, options)
+          const accepted = acceptedOrRejected(
+            extracted,
+            attempts,
+            plugin.name,
+            run.durationMs,
+            options,
+          )
           if (accepted) {
             return accepted
           }
@@ -211,7 +235,7 @@ export const fetchUrl = async (url: string, options: FetchOptions = {}): Promise
         attempts,
         'agent-browser',
         run.durationMs,
-        options
+        options,
       )
       if (accepted) {
         return accepted

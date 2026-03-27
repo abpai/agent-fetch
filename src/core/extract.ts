@@ -8,9 +8,14 @@ const turndown = new TurndownService({
   codeBlockStyle: 'fenced',
 })
 
-export const countWords = (markdown: string): number => markdown.split(/\s+/).filter(Boolean).length
+const countWords = (markdown: string): number =>
+  markdown.split(/\s+/).filter(Boolean).length
 
-export const extractFromHtml = (url: string, html: string, strategy: FetchStrategy): FetchResult => {
+export const extractFromHtml = (
+  url: string,
+  html: string,
+  strategy: FetchStrategy,
+): FetchResult => {
   let title = ''
   let author: string | null = null
   let markdown = ''
@@ -23,7 +28,9 @@ export const extractFromHtml = (url: string, html: string, strategy: FetchStrate
 
     title = article?.title || dom.window.document.title || ''
     author = article?.byline || null
-    markdown = article?.content ? turndown.turndown(article.content) : turndown.turndown(html)
+    markdown = article?.content
+      ? turndown.turndown(article.content)
+      : turndown.turndown(html)
   } catch {
     markdown = turndown.turndown(html)
   } finally {

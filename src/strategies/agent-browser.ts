@@ -11,7 +11,7 @@ interface CommandResult {
 const runCommand = async (
   command: string,
   args: string[],
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<CommandResult> => {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
@@ -66,7 +66,7 @@ const runCheckedCommand = async (
   command: string,
   args: string[],
   timeoutMs: number,
-  action: string
+  action: string,
 ): Promise<CommandResult> => {
   const result = await runCommand(command, args, timeoutMs)
   if (result.code !== 0) {
@@ -98,27 +98,29 @@ const runWorkflow = async (
   command: string,
   cdpPort: string,
   url: string,
-  timeoutMs: number
+  timeoutMs: number,
+  waitForNetworkIdle: boolean,
 ): Promise<string> => {
   await runCheckedCommand(
     command,
     ['--cdp', cdpPort, 'open', url],
     timeoutMs,
-    'agent-browser open'
+    'agent-browser open',
   )
 
+  const loadState = waitForNetworkIdle ? 'networkidle' : 'load'
   await runCheckedCommand(
     command,
-    ['--cdp', cdpPort, 'wait', '--load', 'networkidle'],
+    ['--cdp', cdpPort, 'wait', '--load', loadState],
     timeoutMs,
-    'agent-browser wait'
+    'agent-browser wait',
   )
 
   const htmlResult = await runCheckedCommand(
     command,
     ['--cdp', cdpPort, 'get', 'html', 'body'],
     timeoutMs,
-    'agent-browser get html'
+    'agent-browser get html',
   )
 
   const html = htmlResult.stdout.trim()
@@ -132,7 +134,7 @@ const runWorkflow = async (
 export const runAgentBrowserStrategy = async (
   url: string,
   context: FetchEngineContext,
-  requireCredentials: boolean
+  requireCredentials: boolean,
 ): Promise<string> => {
   const command = context.options.agentBrowser?.command || 'agent-browser'
   const timeoutMs = context.options.timeout ?? DEFAULT_TIMEOUT_MS
@@ -141,7 +143,7 @@ export const runAgentBrowserStrategy = async (
   if (!configuredPort) {
     if (requireCredentials) {
       throw new Error(
-        'Missing AGENT_FETCH_CDP_PORT for authenticated mode. Run `agent-fetch setup` or set AGENT_FETCH_CDP_PORT.'
+        'Missing AGENT_FETCH_CDP_PORT for authenticated mode. Run `agent-fetch setup` or set AGENT_FETCH_CDP_PORT.',
       )
     }
 
@@ -149,9 +151,10 @@ export const runAgentBrowserStrategy = async (
   }
 
   const cdpPort = parsePort(configuredPort)
+  const waitForNetworkIdle = context.options.waitForNetworkIdle ?? true
 
   try {
-    return await runWorkflow(command, cdpPort, url, timeoutMs)
+    return await runWorkflow(command, cdpPort, url, timeoutMs, waitForNetworkIdle)
   } catch (error) {
     const cdpLaunch = resolveLaunchCommand(context)
 
@@ -162,6 +165,6 @@ export const runAgentBrowserStrategy = async (
     runLaunchCommand(cdpLaunch)
     await new Promise((resolve) => setTimeout(resolve, 2_500))
 
-    return runWorkflow(command, cdpPort, url, timeoutMs)
+    return runWorkflow(command, cdpPort, url, timeoutMs, waitForNetworkIdle)
   }
 }
