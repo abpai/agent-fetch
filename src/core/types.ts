@@ -1,0 +1,74 @@
+export type FetchStrategy = 'fetch' | 'jsdom' | 'agent-browser' | (string & {})
+
+export interface FetchResult {
+  url: string
+  title: string
+  author: string | null
+  markdown: string
+  html: string
+  wordCount: number
+  fetchedAt: Date
+  strategy: FetchStrategy
+  attempts: FetchAttempt[]
+}
+
+export interface FetchAttempt {
+  strategy: FetchStrategy
+  ok: boolean
+  reason?: string
+  error?: string
+  durationMs: number
+}
+
+export type StrategyMode = 'auto' | 'simple' | 'authenticated'
+
+export interface FetchOptions {
+  timeout?: number
+  waitForNetworkIdle?: boolean
+  userAgent?: string
+  headers?: Record<string, string>
+  enableFetch?: boolean
+  enableJsdom?: boolean
+  enablePlugins?: boolean
+  enableAgentBrowser?: boolean
+  strategyMode?: StrategyMode
+  withCredentials?: boolean
+  plugins?: PluginConfig[]
+  fetchTimeout?: number
+  jsdomTimeout?: number
+  minHtmlLength?: number
+  minMarkdownLength?: number
+  minWordCount?: number
+  blockedTextPatterns?: Array<string | RegExp>
+  blockedWordCountThreshold?: number
+  agentBrowser?: AgentBrowserOptions
+  environment?: Record<string, string>
+}
+
+export interface FetchEngineContext {
+  timeoutMs: number
+  headers: Record<string, string>
+  options: FetchOptions
+  environment: Record<string, string>
+}
+
+export interface AgentBrowserOptions {
+  cdpPort?: string
+  cdpLaunch?: string
+  command?: string
+}
+
+export class FetchError extends Error {
+  readonly attempts: FetchAttempt[]
+
+  constructor(message: string, attempts: FetchAttempt[]) {
+    super(message)
+    this.name = 'FetchError'
+    this.attempts = attempts
+  }
+}
+
+export interface PluginConfig {
+  type: string
+  [key: string]: unknown
+}

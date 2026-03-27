@@ -1,156 +1,153 @@
-import { describe, it, expect, afterAll } from 'vitest'
-import { crawl, closeBrowser, CrawlError } from './index.js'
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { fetchUrl, FetchError, registerPlugin } from './index.js'
 
-describe('smart scrape fallback chain', () => {
-  afterAll(async () => {
-    await closeBrowser()
+const BASE_HTML = `<!DOCTYPE html><html><head><title>Example Domain</title></head><body><article><h1>Example Domain</h1><p>This domain is for use in illustrative examples in documents.</p></article></body></html>`
+
+const AGENT_BROWSER_HTML = `<!DOCTYPE html><html><head><title>Authenticated Page</title></head><body><article><h1>Authenticated Page</h1><p>Authenticated content from agent-browser.</p></article></body></html>`
+
+let server: ReturnType<typeof createServer>
+let baseUrl: string
+let mockAgentBrowserPath: string
+
+const createMockAgentBrowser = (): string => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fetch-test-'))
+  const scriptPath = path.join(dir, 'mock-agent-browser.mjs')
+  const script = `#!/usr/bin/env node
+const args = process.argv.slice(2)
+
+if (process.env.MOCK_AGENT_BROWSER_FAIL_OPEN === '1' && args.includes('open')) {
+  console.error('simulated open failure')
+  process.exit(1)
+}
+
+if (args.includes('get') && args.includes('html')) {
+  process.stdout.write(${JSON.stringify(AGENT_BROWSER_HTML)})
+  process.exit(0)
+}
+
+process.exit(0)
+`
+
+  writeFileSync(scriptPath, script, 'utf-8')
+  chmodSync(scriptPath, 0o755)
+  return scriptPath
+}
+
+const largeWordBlob = (count: number): string => Array.from({ length: count }, () => 'word').join(' ')
+
+describe('agent-fetch engine', () => {
+  beforeAll(() => {
+    mockAgentBrowserPath = createMockAgentBrowser()
+
+    server = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.end(BASE_HTML)
+    })
+
+    return new Promise<void>((resolve) => {
+      server.listen(0, () => {
+        const addr = server.address()
+        const port = typeof addr === 'object' && addr ? addr.port : 0
+        baseUrl = `http://127.0.0.1:${port}`
+        resolve()
+      })
+    })
   })
 
-  it('uses fetch for simple static pages', async () => {
-    // example.com has only 17 words, so we lower thresholds for this test
-    const result = await crawl('https://example.com', {
-      enableFetch: true,
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  })
+
+  it('uses simple fetch for static pages', async () => {
+    const result = await fetchUrl(baseUrl, {
+      strategyMode: 'simple',
+      enableAgentBrowser: false,
       enableJsdom: false,
-      enablePlaywright: false,
-      enableScrapeDo: false,
-      minWordCount: 10, // Lower threshold for minimal page
-      minMarkdownLength: 50,
+      enablePlugins: false,
+      minHtmlLength: 20,
+      minWordCount: 5,
+      minMarkdownLength: 20,
     })
 
     expect(result.strategy).toBe('fetch')
     expect(result.title).toBe('Example Domain')
-    expect(result.markdown).toContain('documentation')
-    expect(result.wordCount).toBeGreaterThan(0)
+    expect(result.attempts).toHaveLength(1)
+    expect(result.attempts[0].strategy).toBe('fetch')
+    expect(result.attempts[0].ok).toBe(true)
   })
 
-  it('falls back to playwright when fetch result is insufficient', async () => {
-    // For static pages, both fetch and playwright return the same content.
-    // Test with a real JS-rendered site or verify the fallback chain attempts.
-    try {
-      await crawl('https://example.com', {
-        enableFetch: true,
-        enableJsdom: false,
-        enablePlaywright: true,
-        enableScrapeDo: false,
-        minWordCount: 18, // Just above what fetch returns (17)
-        minMarkdownLength: 50,
-      })
-    } catch (error) {
-      // Since example.com is static, both strategies return same content
-      // Verify that it DID try playwright as a fallback
-      expect(error).toBeInstanceOf(CrawlError)
-      const crawlError = error as CrawlError
-      expect(crawlError.attempts).toHaveLength(2)
-      expect(crawlError.attempts[0].strategy).toBe('fetch')
-      expect(crawlError.attempts[0].ok).toBe(false)
-      expect(crawlError.attempts[1].strategy).toBe('playwright')
-      expect(crawlError.attempts[1].ok).toBe(false)
-    }
-  })
-
-  it('throws CrawlError with attempts when all strategies fail', async () => {
-    try {
-      await crawl('https://example.com', {
-        enableFetch: true,
-        enableJsdom: false,
-        enablePlaywright: false,
-        enableScrapeDo: false,
-        minWordCount: 10000, // Impossible threshold
-      })
-      expect.fail('Should have thrown CrawlError')
-    } catch (error) {
-      expect(error).toBeInstanceOf(CrawlError)
-      const crawlError = error as CrawlError
-      expect(crawlError.attempts).toHaveLength(1)
-      expect(crawlError.attempts[0].strategy).toBe('fetch')
-      expect(crawlError.attempts[0].ok).toBe(false)
-      expect(crawlError.attempts[0].reason).toContain('acceptance thresholds')
-    }
-  })
-
-  it('uses jsdom for JS rendering when enabled', async () => {
-    const result = await crawl('https://example.com', {
-      enableFetch: false,
-      enableJsdom: true,
-      enablePlaywright: false,
-      enableScrapeDo: false,
-      minWordCount: 10,
-      minMarkdownLength: 50,
+  it('uses plugin fallback after fetch and jsdom fail thresholds', async () => {
+    registerPlugin('mock-threshold', {
+      name: 'mock-threshold',
+      async fetch() {
+        return `<!DOCTYPE html><html><head><title>Plugin Page</title></head><body><article>${largeWordBlob(1500)}</article></body></html>`
+      },
     })
 
-    expect(result.strategy).toBe('jsdom')
-    expect(result.markdown).toBeTruthy()
+    const result = await fetchUrl(baseUrl, {
+      strategyMode: 'auto',
+      enableAgentBrowser: false,
+      plugins: [{ type: 'mock-threshold' }],
+      minWordCount: 1000,
+      minMarkdownLength: 20,
+    })
+
+    expect(result.strategy).toBe('mock-threshold')
+    expect(result.attempts[0].strategy).toBe('fetch')
+    expect(result.attempts[0].ok).toBe(false)
+    expect(result.attempts[1].strategy).toBe('jsdom')
+    expect(result.attempts[1].ok).toBe(false)
+    expect(result.attempts[2].strategy).toBe('mock-threshold')
+    expect(result.attempts[2].ok).toBe(true)
   })
 
-  it('detects blocked pages and rejects them', async () => {
-    try {
-      await crawl('https://example.com', {
-        enableFetch: true,
-        enablePlaywright: false,
-        blockedTextPatterns: [/example/i], // Match the page content
-        blockedWordCountThreshold: 1000, // Enable pattern matching since page is small
-        minWordCount: 5,
-      })
-      expect.fail('Should have rejected due to blocked pattern')
-    } catch (error) {
-      expect(error).toBeInstanceOf(CrawlError)
-    }
+  it('jumps directly to agent-browser in authenticated mode', async () => {
+    const result = await fetchUrl(baseUrl, {
+      withCredentials: true,
+      enableFetch: true,
+      enableJsdom: true,
+      enablePlugins: true,
+      plugins: [{ type: 'scrape-do', token: 'unused' }],
+      agentBrowser: {
+        cdpPort: '9222',
+        command: mockAgentBrowserPath,
+      },
+      minHtmlLength: 20,
+      minWordCount: 3,
+      minMarkdownLength: 20,
+    })
+
+    expect(result.strategy).toBe('agent-browser')
+    expect(result.attempts).toHaveLength(1)
+    expect(result.attempts[0].strategy).toBe('agent-browser')
+    expect(result.attempts[0].ok).toBe(true)
   })
 
-  it('includes all attempt details in CrawlError', async () => {
-    try {
-      await crawl('https://example.com', {
-        enableFetch: true,
-        enableJsdom: true,
-        enablePlaywright: true,
-        enableScrapeDo: false,
-        minWordCount: 10000, // Impossible threshold
-      })
-      expect.fail('Should have thrown')
-    } catch (error) {
-      expect(error).toBeInstanceOf(CrawlError)
-      const crawlError = error as CrawlError
-      expect(crawlError.attempts.length).toBeGreaterThanOrEqual(3)
+  it('fails fast when authenticated mode agent-browser fails', async () => {
+    process.env.MOCK_AGENT_BROWSER_FAIL_OPEN = '1'
 
-      const strategies = crawlError.attempts.map((a) => a.strategy)
-      expect(strategies).toContain('fetch')
-      expect(strategies).toContain('jsdom')
-      expect(strategies).toContain('playwright')
-    }
-  })
-
-  it('tries strategies in order: fetch -> jsdom -> playwright', async () => {
     try {
-      await crawl('https://example.com', {
-        enableFetch: true,
-        enableJsdom: true,
-        enablePlaywright: true,
-        enableScrapeDo: false,
-        minWordCount: 10000, // Force all to fail
+      await fetchUrl(baseUrl, {
+        withCredentials: true,
+        agentBrowser: {
+          cdpPort: '9222',
+          command: mockAgentBrowserPath,
+        },
       })
+      throw new Error('Expected fetchUrl to throw')
     } catch (error) {
-      expect(error).toBeInstanceOf(CrawlError)
-      const crawlError = error as CrawlError
-      expect(crawlError.attempts[0].strategy).toBe('fetch')
-      expect(crawlError.attempts[1].strategy).toBe('jsdom')
-      expect(crawlError.attempts[2].strategy).toBe('playwright')
-    }
-  })
-
-  it('skips disabled strategies', async () => {
-    try {
-      await crawl('https://example.com', {
-        enableFetch: false, // Disabled
-        enableJsdom: true,
-        enablePlaywright: false, // Disabled
-        enableScrapeDo: false,
-        minWordCount: 10000,
-      })
-    } catch (error) {
-      expect(error).toBeInstanceOf(CrawlError)
-      const crawlError = error as CrawlError
-      expect(crawlError.attempts).toHaveLength(1)
-      expect(crawlError.attempts[0].strategy).toBe('jsdom')
+      expect(error).toBeInstanceOf(FetchError)
+      const fetchError = error as FetchError
+      expect(fetchError.message).toContain('Authenticated fetch failed')
+      expect(fetchError.attempts).toHaveLength(1)
+      expect(fetchError.attempts[0].strategy).toBe('agent-browser')
+      expect(fetchError.attempts[0].ok).toBe(false)
+    } finally {
+      delete process.env.MOCK_AGENT_BROWSER_FAIL_OPEN
     }
   })
 })

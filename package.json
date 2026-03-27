@@ -1,32 +1,47 @@
 {
-  "name": "crawl",
+  "name": "@andypai/agent-fetch",
   "version": "0.1.0",
+  "description": "Agent-first robust URL fetch CLI with smart fallback strategies.",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "files": [
+    "src"
+  ],
+  "bin": {
+    "agent-fetch": "./src/index.ts"
+  },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
     }
   },
-  "files": ["dist"],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "vitest",
-    "format": "prettier --write .",
-    "lint": "eslint .",
-    "prepublishOnly": "pnpm run build"
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build ./src/index.ts --target bun --outdir ./dist",
+    "test": "bun test src",
+    "test:watch": "bun test --watch src",
+    "lint": "bunx eslint .",
+    "format": "bunx prettier --write .",
+    "typecheck": "bunx tsc --noEmit",
+    "check": "bun run lint && bun run typecheck",
+    "precommit": "bun run check && bun run test"
   },
   "dependencies": {
+    "@clack/prompts": "^1.0.1",
     "@mozilla/readability": "^0.6.0",
+    "commander": "^14.0.3",
     "jsdom": "^27.4.0",
-    "playwright": "^1.57.0",
     "turndown": "^7.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
+    "bun-types": "^1.3.8",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^24.1.0",
     "@types/turndown": "^5.0.6",
@@ -37,8 +52,7 @@
     "globals": "^16.2.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.38.0",
-    "vitest": "^3.1.4"
+    "typescript-eslint": "^8.38.0"
   },
-  "packageManager": "pnpm@10.11.0"
+  "packageManager": "bun@1.3.8"
 }
