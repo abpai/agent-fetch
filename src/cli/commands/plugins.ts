@@ -1,13 +1,13 @@
 import { listBuiltinPlugins } from '../../plugins/registry.js'
 import type { PluginsListCommand } from '../types.js'
 
-export interface PluginsListDependencies {
+interface PluginsListDependencies {
   output: (message: string) => void
 }
 
 export const runPluginsListCommand = (
   command: PluginsListCommand,
-  dependencies: PluginsListDependencies
+  dependencies: PluginsListDependencies,
 ): number => {
   const plugins = listBuiltinPlugins()
 
@@ -23,8 +23,10 @@ export const runPluginsListCommand = (
 
   const lines = ['Built-in plugins:']
   for (const plugin of plugins) {
-    const required = plugin.requiredConfig.length > 0 ? plugin.requiredConfig.join(', ') : 'none'
-    const optional = plugin.optionalConfig.length > 0 ? plugin.optionalConfig.join(', ') : 'none'
+    const required =
+      plugin.requiredConfig.length > 0 ? plugin.requiredConfig.join(', ') : 'none'
+    const optional =
+      plugin.optionalConfig.length > 0 ? plugin.optionalConfig.join(', ') : 'none'
 
     lines.push(`- ${plugin.type}: ${plugin.description}`)
     lines.push(`  required: ${required}`)

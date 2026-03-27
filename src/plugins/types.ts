@@ -6,7 +6,11 @@ export interface PluginContext {
 
 export interface FetchPlugin {
   name: string
-  fetch(url: string, config: Record<string, unknown>, context: PluginContext): Promise<string>
+  fetch(
+    url: string,
+    config: Record<string, unknown>,
+    context: PluginContext,
+  ): Promise<string>
 }
 
 export interface BuiltinPluginSpec {

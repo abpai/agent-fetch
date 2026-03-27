@@ -47,7 +47,7 @@ export const listBuiltinPlugins = (): BuiltinPluginSpec[] =>
 
 export const resolvePlugins = (
   pluginConfigs: PluginConfig[],
-  environment: Record<string, string>
+  environment: Record<string, string>,
 ): Array<{ plugin: FetchPlugin; config: Record<string, unknown> }> => {
   const resolved: Array<{ plugin: FetchPlugin; config: Record<string, unknown> }> = []
 
@@ -68,7 +68,7 @@ export const resolvePlugins = (
 export const registerPlugin = (
   type: string,
   plugin: FetchPlugin,
-  spec?: Omit<BuiltinPluginSpec, 'type'>
+  spec?: Omit<BuiltinPluginSpec, 'type'>,
 ): void => {
   BUILTIN_PLUGINS[type] = {
     plugin,

@@ -1,3 +1,4 @@
 dist
+.agents
 package.json
 pnpm-lock.yaml
