@@ -33,8 +33,8 @@ describe('runtime config loader', () => {
           plugins: [{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }],
         },
         null,
-        2
-      )
+        2,
+      ),
     )
 
     writeFileSync(envPath, 'SCRAPEDO_TOKEN=from-env-file\nAGENT_FETCH_TIMEOUT=2000\n')
@@ -62,7 +62,7 @@ describe('runtime config loader', () => {
       loadRuntimeConfig({
         configPath: path.join(dir, 'agent-fetch.config.json'),
         envFilePath: path.join(dir, '.env'),
-      })
+      }),
     ).rejects.toThrow('Legacy config file detected')
   })
 })

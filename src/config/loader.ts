@@ -35,7 +35,12 @@ const toNumber = (value: string | undefined): number | undefined => {
 
 const buildEnvOverrides = (environment: Record<string, string>): AgentFetchConfig => {
   const strategyMode = environment.AGENT_FETCH_STRATEGY_MODE
-  const normalizedMode = strategyMode === 'auto' || strategyMode === 'simple' || strategyMode === 'authenticated' ? strategyMode : undefined
+  const normalizedMode =
+    strategyMode === 'auto' ||
+    strategyMode === 'simple' ||
+    strategyMode === 'authenticated'
+      ? strategyMode
+      : undefined
 
   return {
     timeout: toNumber(environment.AGENT_FETCH_TIMEOUT),
@@ -49,7 +54,9 @@ const buildEnvOverrides = (environment: Record<string, string>): AgentFetchConfi
     minHtmlLength: toNumber(environment.AGENT_FETCH_MIN_HTML_LENGTH),
     minMarkdownLength: toNumber(environment.AGENT_FETCH_MIN_MARKDOWN_LENGTH),
     minWordCount: toNumber(environment.AGENT_FETCH_MIN_WORD_COUNT),
-    blockedWordCountThreshold: toNumber(environment.AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD),
+    blockedWordCountThreshold: toNumber(
+      environment.AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD,
+    ),
     agentBrowser: {
       cdpPort: environment.AGENT_FETCH_CDP_PORT,
       cdpLaunch: environment.AGENT_FETCH_CDP_LAUNCH,
@@ -110,7 +117,7 @@ const findLegacyConfigPath = (): string | null => {
 
 const throwLegacyConfigError = (legacyPath: string): never => {
   throw new Error(
-    `Legacy config file detected at ${legacyPath}. This project now requires agent-fetch config only. Move settings to ~/.config/agent-fetch/config.json and remove legacy files.`
+    `Legacy config file detected at ${legacyPath}. This project now requires agent-fetch config only. Move settings to ~/.config/agent-fetch/config.json and remove legacy files.`,
   )
 }
 
@@ -127,7 +134,7 @@ const readJsonConfig = (filePath: string): AgentFetchConfig => {
   }
 }
 
-export interface LoadRuntimeConfigOptions {
+interface LoadRuntimeConfigOptions {
   configPath?: string
   envFilePath?: string
 }
@@ -136,24 +143,28 @@ export const getDefaultConfigPath = (): string => DEFAULT_CONFIG_PATH
 export const getDefaultEnvPath = (): string => DEFAULT_ENV_PATH
 
 export const loadRuntimeConfig = async (
-  options: LoadRuntimeConfigOptions = {}
+  options: LoadRuntimeConfigOptions = {},
 ): Promise<RuntimeConfig> => {
   const legacyPath = findLegacyConfigPath()
   if (legacyPath) {
     throwLegacyConfigError(legacyPath)
   }
 
-  const configPath = resolvePath(options.configPath ?? process.env.AGENT_FETCH_CONFIG_PATH ?? DEFAULT_CONFIG_PATH)
+  const configPath = resolvePath(
+    options.configPath ?? process.env.AGENT_FETCH_CONFIG_PATH ?? DEFAULT_CONFIG_PATH,
+  )
 
   const envFilePath = resolvePath(
-    options.envFilePath ?? process.env.AGENT_FETCH_SHARED_ENV_PATH ?? DEFAULT_ENV_PATH
+    options.envFilePath ?? process.env.AGENT_FETCH_SHARED_ENV_PATH ?? DEFAULT_ENV_PATH,
   )
 
   const sharedEnv = await readEnvFile(envFilePath)
   const environment = {
     ...sharedEnv,
     ...Object.fromEntries(
-      Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      Object.entries(process.env).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
     ),
   }
 

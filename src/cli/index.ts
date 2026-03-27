@@ -2,9 +2,14 @@ import { Command, CommanderError, InvalidArgumentError } from 'commander'
 import { runFetchCommand } from './commands/fetch.js'
 import { runPluginsListCommand } from './commands/plugins.js'
 import { runSetupCommand } from './commands/setup.js'
-import type { FetchCommand, ParsedCommand, PluginsListCommand, SetupCommand } from './types.js'
+import type {
+  FetchCommand,
+  ParsedCommand,
+  PluginsListCommand,
+  SetupCommand,
+} from './types.js'
 
-export interface RunCliDependencies {
+interface RunCliDependencies {
   output?: (message: string) => void
   error?: (message: string) => void
 }
@@ -15,7 +20,7 @@ export function parseCliArgs(argv: string[]): ParsedCommand {
 
 export async function runCli(
   argv: string[],
-  dependencies: RunCliDependencies = {}
+  dependencies: RunCliDependencies = {},
 ): Promise<number> {
   const output = dependencies.output ?? console.log
   const error = dependencies.error ?? console.error
@@ -39,7 +44,8 @@ export async function runCli(
         return 2
     }
   } catch (unknownError) {
-    const message = unknownError instanceof Error ? unknownError.message : 'Unexpected CLI failure.'
+    const message =
+      unknownError instanceof Error ? unknownError.message : 'Unexpected CLI failure.'
     error(message)
     return 1
   }
@@ -59,7 +65,7 @@ function parseCli(argv: string[]): ParseResult {
     },
     (chunk) => {
       renderedHelpText += chunk
-    }
+    },
   )
 
   if (argv.length === 0) {
@@ -72,7 +78,10 @@ function parseCli(argv: string[]): ParseResult {
   try {
     program.parse(argv, { from: 'user' })
   } catch (unknownError) {
-    if (unknownError instanceof CommanderError && unknownError.code === 'commander.helpDisplayed') {
+    if (
+      unknownError instanceof CommanderError &&
+      unknownError.code === 'commander.helpDisplayed'
+    ) {
       return {
         command: { command: 'help' },
         helpText: renderedHelpText || program.helpInformation(),
@@ -101,7 +110,7 @@ function parseCli(argv: string[]): ParseResult {
 
 function buildProgram(
   onParse: (command: ParsedCommand) => void,
-  onHelpOutput: (chunk: string) => void
+  onHelpOutput: (chunk: string) => void,
 ): Command {
   const program = new Command()
   program
@@ -124,7 +133,7 @@ function buildProgram(
 
 function registerFetchCommand(
   program: Command,
-  onParse: (command: ParsedCommand) => void
+  onParse: (command: ParsedCommand) => void,
 ): void {
   program
     .command('fetch')
@@ -136,12 +145,15 @@ function registerFetchCommand(
     .option('--no-plugins', 'Disable plugin fallback strategies')
     .option('--no-agent-browser', 'Disable agent-browser fallback strategy')
     .option('--timeout <ms>', 'Timeout in milliseconds', positiveInt)
-    .option('--with-credentials', 'Use authenticated mode and jump directly to agent-browser')
+    .option(
+      '--with-credentials',
+      'Use authenticated mode and jump directly to agent-browser',
+    )
     .option(
       '--strategy <mode>',
       'Strategy mode: auto, simple, authenticated',
       parseStrategyMode,
-      'auto'
+      'auto',
     )
     .option('--debug-attempts', 'Print per-attempt details to stderr')
     .action(
@@ -157,7 +169,7 @@ function registerFetchCommand(
           withCredentials?: boolean
           strategy: 'auto' | 'simple' | 'authenticated'
           debugAttempts?: boolean
-        }
+        },
       ) => {
         onParse({
           command: 'fetch',
@@ -172,24 +184,32 @@ function registerFetchCommand(
           strategy: options.strategy,
           debugAttempts: options.debugAttempts === true,
         } satisfies FetchCommand)
-      }
+      },
     )
 }
 
 function registerSetupCommand(
   program: Command,
-  onParse: (command: ParsedCommand) => void
+  onParse: (command: ParsedCommand) => void,
 ): void {
   program
     .command('setup')
     .alias('init')
     .description('Guided setup for authenticated browser credentials and defaults')
-    .option('--config <path>', 'Config file path (default: ~/.config/agent-fetch/config.json)')
+    .option(
+      '--config <path>',
+      'Config file path (default: ~/.config/agent-fetch/config.json)',
+    )
     .option('--env-file <path>', 'Env file path (default: ~/.config/agent-fetch/.env)')
     .option('--no-input', 'Disable interactive prompts')
     .option('--overwrite', 'Overwrite existing setup files')
     .action(
-      (options: { config?: string; envFile?: string; input?: boolean; overwrite?: boolean }) => {
+      (options: {
+        config?: string
+        envFile?: string
+        input?: boolean
+        overwrite?: boolean
+      }) => {
         onParse({
           command: 'setup',
           configPath: options.config,
@@ -197,15 +217,17 @@ function registerSetupCommand(
           noInput: options.input === false,
           overwrite: options.overwrite === true,
         } satisfies SetupCommand)
-      }
+      },
     )
 }
 
 function registerPluginsCommand(
   program: Command,
-  onParse: (command: ParsedCommand) => void
+  onParse: (command: ParsedCommand) => void,
 ): void {
-  const plugins = program.command('plugins').description('Inspect built-in plugin providers')
+  const plugins = program
+    .command('plugins')
+    .description('Inspect built-in plugin providers')
 
   plugins
     .command('list')
@@ -230,7 +252,11 @@ function positiveInt(raw: string): number {
 
 function parseStrategyMode(raw: string): 'auto' | 'simple' | 'authenticated' {
   const normalized = raw.trim().toLowerCase()
-  if (normalized === 'auto' || normalized === 'simple' || normalized === 'authenticated') {
+  if (
+    normalized === 'auto' ||
+    normalized === 'simple' ||
+    normalized === 'authenticated'
+  ) {
     return normalized
   }
 

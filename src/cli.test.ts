@@ -3,24 +3,26 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { parseCliArgs, runCli } from './cli/index.js'
-import { runSetupCommand } from './cli/commands/setup.js'
 
 const originalEnv = {
   AGENT_FETCH_CDP_PORT: process.env.AGENT_FETCH_CDP_PORT,
   AGENT_FETCH_CDP_LAUNCH: process.env.AGENT_FETCH_CDP_LAUNCH,
+  AGENT_FETCH_ENABLE_AGENT_BROWSER: process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER,
+  AGENT_FETCH_ENABLE_PLUGINS: process.env.AGENT_FETCH_ENABLE_PLUGINS,
+  SCRAPEDO_TOKEN: process.env.SCRAPEDO_TOKEN,
+}
+
+async function importSetupModule() {
+  return await import('./cli/commands/setup.js')
 }
 
 afterEach(() => {
-  if (originalEnv.AGENT_FETCH_CDP_PORT === undefined) {
-    delete process.env.AGENT_FETCH_CDP_PORT
-  } else {
-    process.env.AGENT_FETCH_CDP_PORT = originalEnv.AGENT_FETCH_CDP_PORT
-  }
-
-  if (originalEnv.AGENT_FETCH_CDP_LAUNCH === undefined) {
-    delete process.env.AGENT_FETCH_CDP_LAUNCH
-  } else {
-    process.env.AGENT_FETCH_CDP_LAUNCH = originalEnv.AGENT_FETCH_CDP_LAUNCH
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
   }
 })
 
@@ -96,11 +98,17 @@ describe('agent-fetch CLI run', () => {
     const error: string[] = []
 
     const code = await runCli(
-      ['fetch', 'https://example.com', '--strategy', 'authenticated', '--no-agent-browser'],
+      [
+        'fetch',
+        'https://example.com',
+        '--strategy',
+        'authenticated',
+        '--no-agent-browser',
+      ],
       {
         output: (message) => output.push(message),
         error: (message) => error.push(message),
-      }
+      },
     )
 
     expect(code).toBe(2)
@@ -125,12 +133,17 @@ describe('agent-fetch setup', () => {
           plugins: [{ type: 'scrape-do', token: 'stale-token' }],
         },
         null,
-        2
-      )
+        2,
+      ),
     )
 
     process.env.AGENT_FETCH_CDP_PORT = '9222'
+    process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'true'
+    process.env.AGENT_FETCH_ENABLE_PLUGINS = 'false'
     delete process.env.AGENT_FETCH_CDP_LAUNCH
+    delete process.env.SCRAPEDO_TOKEN
+
+    const { runSetupCommand } = await importSetupModule()
 
     await runSetupCommand({
       command: 'setup',
