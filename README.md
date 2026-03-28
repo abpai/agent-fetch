@@ -2,6 +2,8 @@
 
 `agent-fetch` is a robust fetch CLI for AI agents.
 
+By default it returns a useful markdown view of the rendered page, closer to a broad page snapshot than an article-only extractor. You can switch to article-style output, raw HTML, or structured section data when you need something narrower or more mechanical.
+
 It tries the cheapest strategy first, then escalates when needed:
 
 1. `fetch`
@@ -10,6 +12,8 @@ It tries the cheapest strategy first, then escalates when needed:
 4. `agent-browser`
 
 Authenticated mode is explicit: `--with-credentials` jumps straight to `agent-browser` and fails fast if credentials are missing or invalid.
+
+Every successful result also passes lightweight acceptance checks so the CLI can reject obviously blocked, paywalled, or too-thin responses before escalating to the next strategy.
 
 ## Install
 
@@ -27,8 +31,23 @@ bun add @andypai/agent-fetch
 # Markdown output (default)
 agent-fetch fetch https://example.com
 
+# Shorthand: a bare URL implies `fetch`
+agent-fetch https://example.com
+
+# Output mode overrides
+agent-fetch fetch https://example.com --mode markdown
+agent-fetch fetch https://example.com --mode primary
+agent-fetch fetch https://example.com --mode html
+agent-fetch fetch https://example.com --mode structured
+
 # JSON output
 agent-fetch fetch https://example.com --json
+
+# Print per-attempt diagnostics to stderr
+agent-fetch fetch https://example.com --debug-attempts
+
+# Use an explicit config file
+agent-fetch fetch https://example.com --config /tmp/agent-fetch.json
 
 # Disable fallback stages
 agent-fetch fetch https://example.com --no-jsdom --no-plugins
@@ -41,11 +60,21 @@ agent-fetch fetch https://example.com --strategy simple
 agent-fetch fetch https://example.com --strategy authenticated
 ```
 
+### Output modes
+
+- `markdown` (default): convert the cleaned rendered page into markdown and keep broad page structure such as headings, cards, and tables when possible.
+- `primary`: extract article-style primary content with Readability, with metadata fallback for pages that do not have a clear article body.
+- `html`: return the rendered HTML that `agent-fetch` fetched.
+- `structured`: return structured section data derived from markdown headings and links.
+
 ### Setup
 
 ```bash
 # Guided setup
 agent-fetch setup
+
+# Alias
+agent-fetch init
 
 # Non-interactive setup from env vars
 AGENT_FETCH_TIMEOUT=45000 \
@@ -63,6 +92,7 @@ The setup walkthrough can now configure:
 - fetch/jsdom/plugin/agent-browser fallbacks
 - optional scrape.do plugin wiring
 - authenticated browser CDP defaults
+- whether `agent-browser` waits for `networkidle` before extraction
 
 ### Plugins
 
@@ -83,11 +113,19 @@ Default shared env path:
 
 The config file stores runtime defaults. The shared env file stores machine-specific values and secrets such as `AGENT_FETCH_CDP_PORT`, `AGENT_FETCH_CDP_LAUNCH`, and `SCRAPEDO_TOKEN`.
 
+At runtime, precedence is:
+
+1. CLI flags
+2. environment variables (including the shared `.env` file)
+3. config file
+4. built-in defaults
+
 Example config:
 
 ```json
 {
   "timeout": 30000,
+  "outputMode": "markdown",
   "enableFetch": true,
   "enableJsdom": true,
   "enablePlugins": true,
@@ -102,6 +140,12 @@ Example config:
   "waitForNetworkIdle": false
 }
 ```
+
+Notes:
+
+- `waitForNetworkIdle` affects `agent-browser` navigation timing.
+- Plugin config values support `${ENV_VAR}` interpolation.
+- `plugins` are only used in `auto` mode, after `fetch` and `jsdom`.
 
 Example shared env file:
 
@@ -123,6 +167,7 @@ Move settings to `~/.config/agent-fetch/config.json`.
 ### Supported setup env vars
 
 - `AGENT_FETCH_TIMEOUT`
+- `AGENT_FETCH_OUTPUT_MODE`
 - `AGENT_FETCH_ENABLE_FETCH`
 - `AGENT_FETCH_ENABLE_JSDOM`
 - `AGENT_FETCH_ENABLE_PLUGINS`
@@ -136,6 +181,7 @@ Move settings to `~/.config/agent-fetch/config.json`.
 - `AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD`
 - `AGENT_FETCH_CDP_PORT`
 - `AGENT_FETCH_CDP_LAUNCH`
+- `AGENT_FETCH_AGENT_BROWSER_COMMAND`
 - `SCRAPEDO_TOKEN`
 
 ## Library usage
@@ -145,11 +191,15 @@ import { fetchUrl } from '@andypai/agent-fetch'
 
 const result = await fetchUrl('https://example.com', {
   strategyMode: 'auto',
+  outputMode: 'markdown',
 })
 
+console.log(result.outputMode)
 console.log(result.strategy)
-console.log(result.markdown)
+console.log(result.content)
 ```
+
+The package also exports `FetchError`, `registerPlugin()`, and `listBuiltinPlugins()` if you want to embed the engine or add custom plugins programmatically.
 
 ## Output contract (`--json`)
 
@@ -158,8 +208,18 @@ console.log(result.markdown)
   "url": "string",
   "title": "string",
   "author": "string | null",
+  "content": "string",
+  "outputMode": "markdown | primary | html | structured",
   "markdown": "string",
+  "primaryMarkdown": "string",
   "html": "string",
+  "structuredContent": {
+    "title": "string",
+    "description": "string | null",
+    "headings": [{ "level": 2, "text": "Example" }],
+    "sections": [{ "heading": "Example", "level": 2, "content": "..." }],
+    "links": [{ "text": "Example", "href": "https://example.com" }]
+  },
   "wordCount": 123,
   "strategy": "fetch | jsdom | plugin-name | agent-browser",
   "fetchedAt": "ISO-8601",
@@ -172,6 +232,10 @@ console.log(result.markdown)
   ]
 }
 ```
+
+`content` always matches the selected output mode. `markdown` remains available in JSON output even when `--mode` is `primary`, `html`, or `structured`, so callers can inspect both the selected output and the full-page markdown snapshot.
+
+When `--mode structured` is used without `--json`, `content` is the pretty-printed JSON string for `structuredContent`.
 
 ## Development
 

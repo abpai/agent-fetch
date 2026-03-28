@@ -17,7 +17,7 @@ Verify:
 
 ```bash
 agent-fetch --help
-# Should print usage: agent-fetch fetch, setup, plugins subcommands
+# Should print usage for fetch, setup, and plugins subcommands
 ```
 
 ---
@@ -26,7 +26,7 @@ agent-fetch --help
 
 ```bash
 bun run check   # lint + typecheck
-bun run test    # 12 tests across 3 files (src/)
+bun run test    # bun test src
 ```
 
 ---
@@ -44,6 +44,7 @@ agent-fetch plugins --help
 # Argument errors (exit code 2)
 agent-fetch fetch                                  # missing URL
 agent-fetch fetch https://x --strategy bogus       # invalid strategy
+agent-fetch fetch https://x --mode bogus           # invalid output mode
 agent-fetch fetch https://x --timeout abc          # non-numeric timeout
 agent-fetch fetch https://x --with-credentials --no-agent-browser  # incompatible flags
 agent-fetch fetch https://x --strategy authenticated --no-agent-browser  # incompatible flags
@@ -59,9 +60,18 @@ Verify each error prints to stderr and exits with code 2.
 # Markdown output (stdout only)
 agent-fetch fetch https://example.com
 
+# Bare URL shorthand should behave the same
+agent-fetch https://example.com
+
+# Explicit mode overrides
+agent-fetch fetch https://example.com --mode markdown
+agent-fetch fetch https://example.com --mode primary
+agent-fetch fetch https://example.com --mode html
+agent-fetch fetch https://example.com --mode structured
+
 # JSON output — verify all fields present
 agent-fetch fetch https://example.com --json
-# Expected: strategy="fetch", title="Example Domain", wordCount > 0, attempts[0].ok=true
+# Expected: outputMode="markdown", content is markdown, strategy="fetch", title="Example Domain", wordCount > 0, attempts[0].ok=true
 
 # Debug attempts — attempt info goes to stderr
 agent-fetch fetch https://example.com --debug-attempts 2>/tmp/attempts.txt
@@ -70,6 +80,19 @@ cat /tmp/attempts.txt
 
 # Simple mode — fetch only, no fallback
 agent-fetch fetch https://example.com --strategy simple
+```
+
+Mode-specific checks:
+
+```bash
+# Primary mode should prefer article-style content
+agent-fetch fetch https://example.com --mode primary
+
+# HTML mode should emit HTML, not markdown
+agent-fetch fetch https://example.com --mode html | head
+
+# Structured mode should emit JSON section data to stdout
+agent-fetch fetch https://example.com --mode structured
 ```
 
 ---
@@ -210,17 +233,17 @@ AGENT_FETCH_CDP_PORT=9999 agent-fetch fetch https://example.com --with-credentia
 ```bash
 # Config file
 cat > /tmp/test-config.json << 'EOF'
-{ "timeout": 5000, "enableJsdom": false, "minWordCount": 5 }
+{ "timeout": 5000, "enableJsdom": false, "minWordCount": 5, "outputMode": "primary" }
 EOF
 agent-fetch fetch https://example.com --config /tmp/test-config.json --json --debug-attempts
 
 # Env var overrides config file
-AGENT_FETCH_TIMEOUT=2000 agent-fetch fetch https://example.com --config /tmp/test-config.json --json
+AGENT_FETCH_TIMEOUT=2000 AGENT_FETCH_OUTPUT_MODE=structured agent-fetch fetch https://example.com --config /tmp/test-config.json --json
 
 # CLI flags override env vars
-AGENT_FETCH_ENABLE_JSDOM=true agent-fetch fetch https://example.com --no-jsdom --json --debug-attempts 2>/tmp/a.txt
+AGENT_FETCH_ENABLE_JSDOM=true AGENT_FETCH_OUTPUT_MODE=structured agent-fetch fetch https://example.com --no-jsdom --mode html --json --debug-attempts 2>/tmp/a.txt
 cat /tmp/a.txt
-# jsdom should NOT appear (CLI --no-jsdom wins)
+# jsdom should NOT appear (CLI --no-jsdom wins), and outputMode in JSON should be "html"
 ```
 
 ---
@@ -230,10 +253,15 @@ cat /tmp/a.txt
 ```bash
 bun -e "
 import { fetchUrl } from '@andypai/agent-fetch'
-const r = await fetchUrl('https://example.com', { strategyMode: 'simple' })
+const r = await fetchUrl('https://example.com', {
+  strategyMode: 'simple',
+  outputMode: 'markdown',
+})
+console.log('mode:', r.outputMode)
 console.log('strategy:', r.strategy)
 console.log('title:', r.title)
 console.log('words:', r.wordCount)
+console.log('content preview:', r.content.slice(0, 80))
 console.log('attempts:', JSON.stringify(r.attempts))
 "
 ```
@@ -260,11 +288,32 @@ AGENT_FETCH_MIN_WORD_COUNT=999999 agent-fetch fetch https://example.com --strate
 
 ---
 
-## Step 11: Codex app-server JSON-RPC integration
+## Step 11: Portal and homepage behavior
+
+```bash
+# Default markdown should keep broad page structure on homepages
+agent-fetch https://www.investing.com
+
+# Article-style fallback should stay compact
+agent-fetch https://www.investing.com --mode primary
+
+# Structured mode should expose headings/sections/links as JSON
+agent-fetch https://www.investing.com --mode structured
+```
+
+Verify:
+
+- default mode includes major sections like news or markets instead of footer/legal boilerplate
+- `--mode primary` returns a concise summary when the page has no clear article body
+- `--mode structured` returns JSON with `title`, `headings`, `sections`, and `links`
+
+---
+
+## Step 12: Codex app-server JSON-RPC integration
 
 This is the primary integration target. Codex app-server uses JSON-RPC 2.0 over stdio (newline-delimited JSON).
 
-### 11a. Start the app-server
+### 12a. Start the app-server
 
 ```bash
 # Terminal 1: start the app-server
@@ -273,7 +322,7 @@ codex app-server
 
 The server reads JSON-RPC from stdin and writes responses/notifications to stdout.
 
-### 11b. Initialize the connection
+### 12b. Initialize the connection
 
 Send (paste into stdin, press Enter):
 
@@ -294,7 +343,7 @@ You'll get back a response with `"id":1` and a result object. Then send the `ini
 { "method": "initialized" }
 ```
 
-### 11c. Start a thread
+### 12c. Start a thread
 
 ```json
 {
@@ -310,9 +359,9 @@ You'll get back a response with `"id":1` and a result object. Then send the `ini
 
 You'll receive a `thread/started` notification and a response with `thread.id`. Note the `threadId` value (e.g., `"thr_abc123"`).
 
-### 11d. Ask Codex to run agent-fetch
+### 12d. Ask Codex to run agent-fetch
 
-Send a turn with the thread ID from step 11c:
+Send a turn with the thread ID from step 12c:
 
 ```json
 {
@@ -338,7 +387,7 @@ You'll see streaming notifications:
 - `item/completed` — command finishes with stdout/stderr/exitCode
 - `turn/completed` — turn is done
 
-### 11e. Test more commands via turns
+### 12e. Test more commands via turns
 
 Test SKILL.md discovery — ask about available strategies:
 
@@ -394,7 +443,7 @@ Test plugin listing:
 }
 ```
 
-### 11f. Direct command execution (no thread)
+### 12f. Direct command execution (no thread)
 
 You can also run commands directly without a thread context:
 
@@ -411,7 +460,7 @@ You can also run commands directly without a thread context:
 
 This returns stdout, stderr, and exitCode directly.
 
-### 11g. Scripted test (pipe messages)
+### 12g. Scripted test (pipe messages)
 
 For a complete automated test, create a script:
 
@@ -443,7 +492,7 @@ chmod +x /tmp/test-app-server.sh
 /tmp/test-app-server.sh
 ```
 
-### 11h. WebSocket transport (alternative)
+### 12h. WebSocket transport (alternative)
 
 ```bash
 # Start with WebSocket
@@ -459,9 +508,10 @@ websocat ws://127.0.0.1:4500
 ## Verification checklist
 
 - [ ] `bun run check` passes
-- [ ] `bun run test` passes (10 tests)
+- [ ] `bun run test` passes
 - [ ] `agent-fetch --help` prints help
-- [ ] `agent-fetch fetch <url>` returns markdown to stdout
+- [ ] `agent-fetch fetch <url>` returns content for the selected output mode to stdout
+- [ ] `agent-fetch fetch <url> --mode primary|html|structured` returns the expected alternate shape
 - [ ] `agent-fetch fetch <url> --json` returns valid JSON
 - [ ] `agent-fetch fetch <url> --strategy simple` uses fetch only
 - [ ] `agent-fetch fetch <url> --debug-attempts` prints to stderr

@@ -10,13 +10,21 @@ It prioritizes low-cost extraction first and escalates only when needed, while k
 
 - CLI binary: `agent-fetch`
 - Core command: `agent-fetch fetch <url>`
-- Supporting commands: `agent-fetch setup`, `agent-fetch plugins list`
+- Supporting commands: `agent-fetch setup` (alias: `agent-fetch init`), `agent-fetch plugins list`
+- Library API: `fetchUrl()`, `FetchError`, `registerPlugin()`, `listBuiltinPlugins()`
 
 ## Strategy Modes
 
 - `auto` (default): `fetch -> jsdom -> plugins -> agent-browser`
 - `simple`: `fetch` only
 - `authenticated`: `agent-browser` only (same behavior as `--with-credentials`)
+
+## Output Modes
+
+- `markdown` (default): broad rendered-page markdown built from cleaned HTML
+- `primary`: article-style primary content via Readability, with metadata fallback for non-article pages
+- `html`: rendered HTML
+- `structured`: structured sections, headings, and links derived from markdown; CLI text output is a JSON string for this mode
 
 ## Authenticated Fast Path
 
@@ -35,6 +43,12 @@ Shared env file:
 
 - `~/.config/agent-fetch/.env`
 - optional override: `AGENT_FETCH_SHARED_ENV_PATH`
+
+Precedence:
+
+- CLI flags override environment variables
+- environment variables override config file values
+- config file values override built-in defaults
 
 Credential keys:
 
@@ -61,10 +75,13 @@ Legacy files are hard-rejected:
   - built-in plugin discovery output
 - `src/core/fetch-engine.ts`
   - strategy orchestration and attempt tracking
+  - authenticated fast path and acceptance-driven escalation
 - `src/core/acceptance.ts`
-  - threshold + blocked/paywall checks
+  - threshold + blocked/paywall checks used to reject weak results and continue fallback
 - `src/core/extract.ts`
-  - Readability + Turndown extraction
+  - full-page markdown extraction via cleaned HTML + Kreuzberg
+  - primary extraction via Readability + Turndown
+  - structured output assembly for section-aware consumers
 - `src/strategies/`
   - `fetch.ts`, `jsdom.ts`, `agent-browser.ts`
 - `src/plugins/`
@@ -76,10 +93,12 @@ Legacy files are hard-rejected:
 
 - Fetch failures throw `FetchError` with per-strategy `attempts[]`.
 - CLI prints actionable errors to `stderr` and returns non-zero exit.
-- `stdout` remains reserved for primary output (markdown or JSON).
+- `stdout` remains reserved for the selected content output (`markdown`, `primary`, `html`, `structured`) or JSON.
+- `--debug-attempts` prints per-attempt diagnostics to `stderr` on success too.
 
 ## Plugin Model (v1)
 
 - Built-ins + local register API only (`registerPlugin`)
 - No dynamic npm plugin auto-loading
 - Plugin config supports `${ENV_VAR}` interpolation
+- Built-in discovery surface today is `plugins list`, currently exposing `scrape-do`

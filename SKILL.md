@@ -5,13 +5,21 @@ description: Use agent-fetch to fetch robust page content for AI agents with sta
 
 # agent-fetch
 
-Use this workflow when an agent needs clean markdown or structured JSON from a URL.
+Use this workflow when an agent needs robust page content from a URL, with broad markdown by default and narrower output modes available when needed.
 
 ## Core command
 
 ```bash
-# Markdown output
+# Markdown output (default)
 agent-fetch fetch https://example.com
+
+# Bare URL shorthand
+agent-fetch https://example.com
+
+# Alternate output modes
+agent-fetch fetch https://example.com --mode primary
+agent-fetch fetch https://example.com --mode html
+agent-fetch fetch https://example.com --mode structured
 
 # JSON output
 agent-fetch fetch https://example.com --json
@@ -58,7 +66,7 @@ agent-fetch plugins list --json
 
 ## Guardrails
 
-- For `fetch`, `stdout` is reserved for primary output (markdown or JSON).
+- For `fetch`, `stdout` is reserved for the selected content output or JSON.
 - For `fetch`, errors and debug attempt details go to `stderr`.
 - Legacy config files (`.fetchrc.json`, `fetch.config.json`) are rejected with a hard error.
 - `--with-credentials` never silently downgrades to non-authenticated strategies.
