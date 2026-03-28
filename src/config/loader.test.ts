@@ -16,6 +16,7 @@ const makeTempDir = (): string => {
 afterEach(() => {
   process.chdir(originalCwd)
   delete process.env.AGENT_FETCH_TIMEOUT
+  delete process.env.AGENT_FETCH_OUTPUT_MODE
 })
 
 describe('runtime config loader', () => {
@@ -37,8 +38,12 @@ describe('runtime config loader', () => {
       ),
     )
 
-    writeFileSync(envPath, 'SCRAPEDO_TOKEN=from-env-file\nAGENT_FETCH_TIMEOUT=2000\n')
+    writeFileSync(
+      envPath,
+      'SCRAPEDO_TOKEN=from-env-file\nAGENT_FETCH_TIMEOUT=2000\nAGENT_FETCH_OUTPUT_MODE=primary\n',
+    )
     process.env.AGENT_FETCH_TIMEOUT = '3000'
+    process.env.AGENT_FETCH_OUTPUT_MODE = 'structured'
 
     const runtime = await loadRuntimeConfig({
       configPath,
@@ -46,6 +51,7 @@ describe('runtime config loader', () => {
     })
 
     expect(runtime.config.timeout).toBe(3000)
+    expect(runtime.config.outputMode).toBe('structured')
     expect(runtime.config.enableJsdom).toBe(true)
     expect(runtime.config.plugins).toHaveLength(1)
     expect(runtime.environment.SCRAPEDO_TOKEN).toBe('from-env-file')

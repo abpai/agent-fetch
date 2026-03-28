@@ -3,8 +3,11 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { readEnvFile } from './env-file.js'
 import type { AgentFetchConfig, RuntimeConfig } from './types.js'
+import type { OutputMode } from '../core/types.js'
 
 const LEGACY_CONFIG_FILES = ['.fetchrc.json', 'fetch.config.json']
+const OUTPUT_MODES = ['markdown', 'primary', 'html', 'structured'] as const
+const STRATEGY_MODES = ['auto', 'simple', 'authenticated'] as const
 
 const DEFAULT_CONFIG_PATH = path.join(homedir(), '.config', 'agent-fetch', 'config.json')
 const DEFAULT_ENV_PATH = path.join(homedir(), '.config', 'agent-fetch', '.env')
@@ -33,16 +36,20 @@ const toNumber = (value: string | undefined): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+const toOutputMode = (value: string | undefined): OutputMode | undefined => {
+  if (value && OUTPUT_MODES.includes(value as OutputMode)) {
+    return value as OutputMode
+  }
+
+  return undefined
+}
+
 const buildEnvOverrides = (environment: Record<string, string>): AgentFetchConfig => {
   const strategyMode = environment.AGENT_FETCH_STRATEGY_MODE
-  const normalizedMode =
-    strategyMode === 'auto' ||
-    strategyMode === 'simple' ||
-    strategyMode === 'authenticated'
-      ? strategyMode
-      : undefined
+  const normalizedMode = STRATEGY_MODES.find((mode) => mode === strategyMode)
 
   return {
+    outputMode: toOutputMode(environment.AGENT_FETCH_OUTPUT_MODE),
     timeout: toNumber(environment.AGENT_FETCH_TIMEOUT),
     waitForNetworkIdle: toBoolean(environment.AGENT_FETCH_WAIT_FOR_NETWORK_IDLE),
     userAgent: environment.AGENT_FETCH_USER_AGENT,

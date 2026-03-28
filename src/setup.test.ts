@@ -15,6 +15,8 @@ const originalEnv = {
   AGENT_FETCH_STRATEGY_MODE: process.env.AGENT_FETCH_STRATEGY_MODE,
   AGENT_FETCH_CDP_PORT: process.env.AGENT_FETCH_CDP_PORT,
   AGENT_FETCH_CDP_LAUNCH: process.env.AGENT_FETCH_CDP_LAUNCH,
+  AGENT_FETCH_AGENT_BROWSER_COMMAND: process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND,
+  AGENT_FETCH_OUTPUT_MODE: process.env.AGENT_FETCH_OUTPUT_MODE,
   AGENT_FETCH_USER_AGENT: process.env.AGENT_FETCH_USER_AGENT,
   AGENT_FETCH_WAIT_FOR_NETWORK_IDLE: process.env.AGENT_FETCH_WAIT_FOR_NETWORK_IDLE,
   AGENT_FETCH_MIN_HTML_LENGTH: process.env.AGENT_FETCH_MIN_HTML_LENGTH,
@@ -148,6 +150,7 @@ describe('agent-fetch setup wizard', () => {
     process.env.AGENT_FETCH_ENABLE_PLUGINS = 'true'
     process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'false'
     process.env.AGENT_FETCH_STRATEGY_MODE = 'simple'
+    process.env.AGENT_FETCH_OUTPUT_MODE = 'html'
     process.env.AGENT_FETCH_WAIT_FOR_NETWORK_IDLE = 'true'
     process.env.AGENT_FETCH_USER_AGENT = 'NoInput UA'
     process.env.AGENT_FETCH_MIN_HTML_LENGTH = '40'
@@ -169,6 +172,7 @@ describe('agent-fetch setup wizard', () => {
 
     const config = JSON.parse(await readFile(configPath, 'utf8')) as {
       timeout: number
+      outputMode: string
       enableFetch: boolean
       enableJsdom: boolean
       enablePlugins: boolean
@@ -185,6 +189,7 @@ describe('agent-fetch setup wizard', () => {
     const envFile = await readFile(envFilePath, 'utf8')
 
     expect(config.timeout).toBe(15_000)
+    expect(config.outputMode).toBe('html')
     expect(config.enableFetch).toBe(false)
     expect(config.enableJsdom).toBe(true)
     expect(config.enablePlugins).toBe(true)
@@ -198,6 +203,30 @@ describe('agent-fetch setup wizard', () => {
     expect(config.blockedWordCountThreshold).toBe(6)
     expect(config.plugins).toEqual([{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }])
     expect(envFile.trim()).toBe('SCRAPEDO_TOKEN=env-scrape-token')
+  })
+
+  it('writes agent-browser command for authenticated no-input setup when provided', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
+    tempDirs.push(tempDir)
+    const configPath = join(tempDir, 'config.json')
+    const envFilePath = join(tempDir, '.env')
+
+    process.env.AGENT_FETCH_STRATEGY_MODE = 'authenticated'
+    process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'true'
+    process.env.AGENT_FETCH_CDP_PORT = '9222'
+    process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND = 'agent-browser'
+
+    const { runSetupCommand } = await importSetupModule()
+    await runSetupCommand({
+      command: 'setup',
+      configPath,
+      envFilePath,
+      noInput: true,
+      overwrite: true,
+    })
+
+    const envFile = await readFile(envFilePath, 'utf8')
+    expect(envFile).toContain('AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser')
   })
 
   it('requires AGENT_FETCH_CDP_PORT for authenticated no-input setup', async () => {

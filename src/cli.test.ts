@@ -46,6 +46,7 @@ describe('agent-fetch CLI parsing', () => {
       url: 'https://example.com',
       json: true,
       configPath: undefined,
+      outputMode: undefined,
       noJsdom: true,
       noPlugins: true,
       noAgentBrowser: false,
@@ -53,6 +54,32 @@ describe('agent-fetch CLI parsing', () => {
       withCredentials: false,
       strategy: 'simple',
       debugAttempts: true,
+    })
+  })
+
+  it('treats a bare URL as fetch shorthand', () => {
+    const parsed = parseCliArgs([
+      'https://example.com',
+      '--json',
+      '--strategy',
+      'simple',
+      '--mode',
+      'html',
+    ])
+
+    expect(parsed).toEqual({
+      command: 'fetch',
+      url: 'https://example.com',
+      json: true,
+      configPath: undefined,
+      outputMode: 'html',
+      noJsdom: false,
+      noPlugins: false,
+      noAgentBrowser: false,
+      timeout: undefined,
+      withCredentials: false,
+      strategy: 'simple',
+      debugAttempts: false,
     })
   })
 
@@ -105,6 +132,25 @@ describe('agent-fetch CLI run', () => {
         'authenticated',
         '--no-agent-browser',
       ],
+      {
+        output: (message) => output.push(message),
+        error: (message) => error.push(message),
+      },
+    )
+
+    expect(code).toBe(2)
+    expect(output).toHaveLength(0)
+    expect(error).toEqual([
+      '`authenticated` mode cannot be combined with `--no-agent-browser`.',
+    ])
+  })
+
+  it('applies fetch shorthand during CLI execution', async () => {
+    const output: string[] = []
+    const error: string[] = []
+
+    const code = await runCli(
+      ['https://example.com', '--strategy', 'authenticated', '--no-agent-browser'],
       {
         output: (message) => output.push(message),
         error: (message) => error.push(message),

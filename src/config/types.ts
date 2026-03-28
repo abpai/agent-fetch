@@ -1,6 +1,7 @@
-import type { AgentBrowserOptions, PluginConfig } from '../core/types.js'
+import type { AgentBrowserOptions, OutputMode, PluginConfig } from '../core/types.js'
 
 export interface AgentFetchConfig {
+  outputMode?: OutputMode
   timeout?: number
   waitForNetworkIdle?: boolean
   userAgent?: string

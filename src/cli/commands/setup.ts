@@ -13,7 +13,7 @@ import { dirname } from 'node:path'
 import { readEnvFile, writeEnvFile } from '../../config/env-file.js'
 import { getDefaultConfigPath, getDefaultEnvPath } from '../../config/loader.js'
 import type { AgentFetchConfig } from '../../config/types.js'
-import type { StrategyMode } from '../../core/types.js'
+import type { OutputMode, StrategyMode } from '../../core/types.js'
 import type { SetupCommand } from '../types.js'
 
 const DEFAULT_CONFIG: AgentFetchConfig = {
@@ -47,13 +47,21 @@ const resolvePath = (value: string): string => {
   return value
 }
 
-const buildEnvValues = (cdpPort: string, cdpLaunch: string): Record<string, string> => {
+const buildEnvValues = (
+  cdpPort: string,
+  cdpLaunch: string,
+  command?: string,
+): Record<string, string> => {
   const values: Record<string, string> = {
     AGENT_FETCH_CDP_PORT: cdpPort,
   }
 
   if (cdpLaunch) {
     values.AGENT_FETCH_CDP_LAUNCH = cdpLaunch
+  }
+
+  if (command?.trim()) {
+    values.AGENT_FETCH_AGENT_BROWSER_COMMAND = command.trim()
   }
 
   return values
@@ -155,6 +163,24 @@ const parseStrategyMode = (value: string | undefined): StrategyMode | undefined 
     normalized === 'auto' ||
     normalized === 'simple' ||
     normalized === 'authenticated'
+  ) {
+    return normalized
+  }
+
+  return undefined
+}
+
+const parseOutputMode = (value: string | undefined): OutputMode | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (
+    normalized === 'markdown' ||
+    normalized === 'primary' ||
+    normalized === 'html' ||
+    normalized === 'structured'
   ) {
     return normalized
   }
@@ -286,6 +312,7 @@ const buildArtifactsFromEnv = (): SetupArtifacts => {
 
   const scrapeDoToken = getCurrentPluginToken(process.env)
   const config: AgentFetchConfig = {
+    outputMode: parseOutputMode(process.env.AGENT_FETCH_OUTPUT_MODE),
     timeout:
       process.env.AGENT_FETCH_TIMEOUT !== undefined
         ? parsePositiveInt(process.env.AGENT_FETCH_TIMEOUT, 'AGENT_FETCH_TIMEOUT')
@@ -318,7 +345,11 @@ const buildArtifactsFromEnv = (): SetupArtifacts => {
 
     Object.assign(
       envValues,
-      buildEnvValues(cdpPort, (process.env.AGENT_FETCH_CDP_LAUNCH ?? '').trim()),
+      buildEnvValues(
+        cdpPort,
+        (process.env.AGENT_FETCH_CDP_LAUNCH ?? '').trim(),
+        process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND,
+      ),
     )
   }
 

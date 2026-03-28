@@ -1,13 +1,23 @@
 import { loadRuntimeConfig } from '../../config/loader.js'
 import { fetchUrl } from '../../core/fetch-engine.js'
 import { FetchError } from '../../core/types.js'
-import type { StrategyMode } from '../../core/types.js'
+import type { OutputMode, StrategyMode } from '../../core/types.js'
 import type { FetchCommand } from '../types.js'
 
 interface FetchCommandDependencies {
   output: (message: string) => void
   error: (message: string) => void
 }
+
+const resolveStrategyMode = (command: FetchCommand): StrategyMode =>
+  command.withCredentials || command.strategy === 'authenticated'
+    ? 'authenticated'
+    : command.strategy
+
+const resolveOutputMode = (
+  command: FetchCommand,
+  runtimeOutputMode: OutputMode | undefined,
+): OutputMode => command.outputMode ?? runtimeOutputMode ?? 'markdown'
 
 const renderAttempt = (attempt: {
   strategy: string
@@ -32,10 +42,7 @@ export const runFetchCommand = async (
   dependencies: FetchCommandDependencies,
 ): Promise<number> => {
   try {
-    let strategyMode: StrategyMode = command.strategy
-    if (command.withCredentials || command.strategy === 'authenticated') {
-      strategyMode = 'authenticated'
-    }
+    const strategyMode = resolveStrategyMode(command)
 
     if (strategyMode === 'authenticated' && command.noAgentBrowser) {
       dependencies.error(
@@ -45,9 +52,11 @@ export const runFetchCommand = async (
     }
 
     const runtime = await loadRuntimeConfig({ configPath: command.configPath })
+    const outputMode = resolveOutputMode(command, runtime.config.outputMode)
 
     const options = {
       ...runtime.config,
+      outputMode,
       enableJsdom: command.noJsdom ? false : (runtime.config.enableJsdom ?? true),
       enablePlugins: command.noPlugins ? false : (runtime.config.enablePlugins ?? true),
       enableAgentBrowser: command.noAgentBrowser
@@ -70,8 +79,12 @@ export const runFetchCommand = async (
             url: result.url,
             title: result.title,
             author: result.author,
+            content: result.content,
+            outputMode: result.outputMode,
             markdown: result.markdown,
+            primaryMarkdown: result.primaryMarkdown,
             html: result.html,
+            structuredContent: result.structuredContent,
             wordCount: result.wordCount,
             strategy: result.strategy,
             fetchedAt: result.fetchedAt.toISOString(),
@@ -82,7 +95,7 @@ export const runFetchCommand = async (
         ),
       )
     } else {
-      dependencies.output(result.markdown)
+      dependencies.output(result.content)
     }
 
     if (command.debugAttempts) {

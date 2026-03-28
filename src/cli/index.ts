@@ -2,6 +2,7 @@ import { Command, CommanderError, InvalidArgumentError } from 'commander'
 import { runFetchCommand } from './commands/fetch.js'
 import { runPluginsListCommand } from './commands/plugins.js'
 import { runSetupCommand } from './commands/setup.js'
+import type { OutputMode } from '../core/types.js'
 import type {
   FetchCommand,
   ParsedCommand,
@@ -57,6 +58,7 @@ interface ParseResult {
 }
 
 function parseCli(argv: string[]): ParseResult {
+  const normalizedArgv = normalizeCliArgs(argv)
   let parsedCommand: ParsedCommand | undefined
   let renderedHelpText = ''
   const program = buildProgram(
@@ -68,7 +70,7 @@ function parseCli(argv: string[]): ParseResult {
     },
   )
 
-  if (argv.length === 0) {
+  if (normalizedArgv.length === 0) {
     return {
       command: { command: 'help' },
       helpText: program.helpInformation(),
@@ -76,7 +78,7 @@ function parseCli(argv: string[]): ParseResult {
   }
 
   try {
-    program.parse(argv, { from: 'user' })
+    program.parse(normalizedArgv, { from: 'user' })
   } catch (unknownError) {
     if (
       unknownError instanceof CommanderError &&
@@ -105,6 +107,27 @@ function parseCli(argv: string[]): ParseResult {
   return {
     command: parsedCommand,
     helpText: program.helpInformation(),
+  }
+}
+
+function normalizeCliArgs(argv: string[]): string[] {
+  if (argv.length === 0) {
+    return argv
+  }
+
+  return isLikelyUrl(argv[0]) ? ['fetch', ...argv] : argv
+}
+
+function isLikelyUrl(value: string | undefined): boolean {
+  if (!value) {
+    return false
+  }
+
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
   }
 }
 
@@ -144,6 +167,11 @@ function registerFetchCommand(
     .option('--no-jsdom', 'Disable jsdom fallback strategy')
     .option('--no-plugins', 'Disable plugin fallback strategies')
     .option('--no-agent-browser', 'Disable agent-browser fallback strategy')
+    .option(
+      '--mode <mode>',
+      'Output mode: markdown, primary, html, structured',
+      parseOutputMode,
+    )
     .option('--timeout <ms>', 'Timeout in milliseconds', positiveInt)
     .option(
       '--with-credentials',
@@ -162,6 +190,7 @@ function registerFetchCommand(
         options: {
           json?: boolean
           config?: string
+          mode?: OutputMode
           jsdom?: boolean
           plugins?: boolean
           agentBrowser?: boolean
@@ -176,6 +205,7 @@ function registerFetchCommand(
           url,
           json: options.json === true,
           configPath: options.config,
+          outputMode: options.mode,
           noJsdom: options.jsdom === false,
           noPlugins: options.plugins === false,
           noAgentBrowser: options.agentBrowser === false,
@@ -261,6 +291,22 @@ function parseStrategyMode(raw: string): 'auto' | 'simple' | 'authenticated' {
   }
 
   throw new InvalidArgumentError("Expected one of: 'auto', 'simple', 'authenticated'.")
+}
+
+function parseOutputMode(raw: string): OutputMode {
+  const normalized = raw.trim().toLowerCase()
+  if (
+    normalized === 'markdown' ||
+    normalized === 'primary' ||
+    normalized === 'html' ||
+    normalized === 'structured'
+  ) {
+    return normalized
+  }
+
+  throw new InvalidArgumentError(
+    "Expected one of: 'markdown', 'primary', 'html', 'structured'.",
+  )
 }
 
 function normalizeCommanderError(message: string): string {
