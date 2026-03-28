@@ -117,7 +117,12 @@ export const fetchUrl = async (
   const runAuthenticated = async (): Promise<FetchResult> => {
     try {
       const run = await timed(() => runAgentBrowserStrategy(url, context, true))
-      const extracted = extractFromHtml(url, run.value, 'agent-browser')
+      const extracted = await extractFromHtml(
+        url,
+        run.value,
+        'agent-browser',
+        options.outputMode,
+      )
       const accepted = acceptedOrRejected(
         extracted,
         attempts,
@@ -150,7 +155,7 @@ export const fetchUrl = async (
     try {
       const run = await timed(() => runFetchStrategy(url, context))
       fetchedHtml = run.value
-      const extracted = extractFromHtml(url, run.value, 'fetch')
+      const extracted = await extractFromHtml(url, run.value, 'fetch', options.outputMode)
       const accepted = acceptedOrRejected(
         extracted,
         attempts,
@@ -177,7 +182,7 @@ export const fetchUrl = async (
     try {
       const html = fetchedHtml ?? (await runFetchStrategy(url, context))
       const run = await timed(() => runJsdomStrategy(url, html, context))
-      const extracted = extractFromHtml(url, run.value, 'jsdom')
+      const extracted = await extractFromHtml(url, run.value, 'jsdom', options.outputMode)
       const accepted = acceptedOrRejected(
         extracted,
         attempts,
@@ -208,7 +213,12 @@ export const fetchUrl = async (
             }),
           )
 
-          const extracted = extractFromHtml(url, run.value, plugin.name)
+          const extracted = await extractFromHtml(
+            url,
+            run.value,
+            plugin.name,
+            options.outputMode,
+          )
           const accepted = acceptedOrRejected(
             extracted,
             attempts,
@@ -229,7 +239,12 @@ export const fetchUrl = async (
   if (enableAgentBrowser && mode === 'auto') {
     try {
       const run = await timed(() => runAgentBrowserStrategy(url, context, false))
-      const extracted = extractFromHtml(url, run.value, 'agent-browser')
+      const extracted = await extractFromHtml(
+        url,
+        run.value,
+        'agent-browser',
+        options.outputMode,
+      )
       const accepted = acceptedOrRejected(
         extracted,
         attempts,

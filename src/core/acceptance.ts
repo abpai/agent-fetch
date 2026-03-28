@@ -45,13 +45,18 @@ const normalizePatterns = (patterns: Array<string | RegExp> | undefined): RegExp
   )
 }
 
+const getValidationText = (result: FetchResult): string =>
+  result.outputMode === 'primary'
+    ? result.primaryMarkdown || result.markdown
+    : result.markdown
+
 const buildTextHaystack = (result: FetchResult): string =>
-  `${result.title}\n${result.markdown}`
+  `${result.title}\n${getValidationText(result)}`
 
 const isLikelyBlocked = (result: FetchResult, options: FetchOptions): boolean => {
   const threshold =
     options.blockedWordCountThreshold ?? DEFAULT_BLOCKED_WORD_COUNT_THRESHOLD
-  if (result.wordCount >= threshold) {
+  if (countWords(getValidationText(result)) >= threshold) {
     return false
   }
 
@@ -60,6 +65,8 @@ const isLikelyBlocked = (result: FetchResult, options: FetchOptions): boolean =>
 
   return patterns.some((pattern) => pattern.test(haystack))
 }
+
+const countWords = (value: string): number => value.split(/\s+/).filter(Boolean).length
 
 const isLikelyPaywalled = (result: FetchResult): boolean => {
   const haystack = buildTextHaystack(result)
@@ -73,6 +80,8 @@ export const validateResult = (
   const minHtmlLength = options.minHtmlLength ?? DEFAULT_MIN_HTML_LENGTH
   const minMarkdownLength = options.minMarkdownLength ?? DEFAULT_MIN_MARKDOWN_LENGTH
   const minWordCount = options.minWordCount ?? DEFAULT_MIN_WORD_COUNT
+  const validationText = getValidationText(result)
+  const validationWordCount = countWords(validationText)
 
   if (result.html.trim().length < minHtmlLength) {
     return {
@@ -81,17 +90,17 @@ export const validateResult = (
     }
   }
 
-  if (result.markdown.trim().length < minMarkdownLength) {
+  if (validationText.trim().length < minMarkdownLength) {
     return {
       acceptable: false,
-      reason: `markdown length ${result.markdown.trim().length} below minimum ${minMarkdownLength}`,
+      reason: `markdown length ${validationText.trim().length} below minimum ${minMarkdownLength}`,
     }
   }
 
-  if (result.wordCount < minWordCount) {
+  if (validationWordCount < minWordCount) {
     return {
       acceptable: false,
-      reason: `word count ${result.wordCount} below minimum ${minWordCount}`,
+      reason: `word count ${validationWordCount} below minimum ${minWordCount}`,
     }
   }
 

@@ -1,11 +1,40 @@
 export type FetchStrategy = 'fetch' | 'jsdom' | 'agent-browser' | (string & {})
+export type OutputMode = 'markdown' | 'primary' | 'html' | 'structured'
+
+export interface StructuredHeading {
+  level: number
+  text: string
+}
+
+export interface StructuredSection {
+  heading: string
+  level: number
+  content: string
+}
+
+export interface StructuredLink {
+  text: string
+  href: string
+}
+
+export interface StructuredContent {
+  title: string
+  description: string | null
+  headings: StructuredHeading[]
+  sections: StructuredSection[]
+  links: StructuredLink[]
+}
 
 export interface FetchResult {
   url: string
   title: string
   author: string | null
+  content: string
+  outputMode: OutputMode
   markdown: string
+  primaryMarkdown: string
   html: string
+  structuredContent: StructuredContent | null
   wordCount: number
   fetchedAt: Date
   strategy: FetchStrategy
@@ -23,6 +52,7 @@ export interface FetchAttempt {
 export type StrategyMode = 'auto' | 'simple' | 'authenticated'
 
 export interface FetchOptions {
+  outputMode?: OutputMode
   timeout?: number
   waitForNetworkIdle?: boolean
   userAgent?: string

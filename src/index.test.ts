@@ -9,6 +9,8 @@ const BASE_HTML = `<!DOCTYPE html><html><head><title>Example Domain</title></hea
 
 const AGENT_BROWSER_HTML = `<!DOCTYPE html><html><head><title>Authenticated Page</title></head><body><article><h1>Authenticated Page</h1><p>Authenticated content from agent-browser.</p></article></body></html>`
 
+const PORTAL_HTML = `<!DOCTYPE html><html><head><title>Portal Page</title><meta name="description" content="Portal description" /></head><body><header><nav><a href="/news">News</a></nav></header><main><section><h2><a href="/news">News</a></h2><article><h3><a href="/news/hero">Hero headline</a></h3><p>Lead story summary for homepage readers.</p></article></section><section><h2><a href="/markets">Markets</a></h2><table><thead><tr><th>Name</th><th>Last</th></tr></thead><tbody><tr><td>Dow Jones</td><td>45,960.11</td></tr></tbody></table></section></main><footer><p>Risk Disclosure</p><p>Fusion Media Limited. All Rights Reserved.</p></footer></body></html>`
+
 let server: ReturnType<typeof createServer>
 let baseUrl: string
 let mockAgentBrowserPath: string
@@ -44,9 +46,9 @@ describe('agent-fetch engine', () => {
   beforeAll(() => {
     mockAgentBrowserPath = createMockAgentBrowser()
 
-    server = createServer((_req, res) => {
+    server = createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.end(BASE_HTML)
+      res.end(req.url === '/portal' ? PORTAL_HTML : BASE_HTML)
     })
 
     return new Promise<void>((resolve) => {
@@ -76,6 +78,8 @@ describe('agent-fetch engine', () => {
 
     expect(result.strategy).toBe('fetch')
     expect(result.title).toBe('Example Domain')
+    expect(result.outputMode).toBe('markdown')
+    expect(result.content).toContain('# Example Domain')
     expect(result.attempts).toHaveLength(1)
     const [fetchAttempt] = result.attempts
     expect(fetchAttempt?.strategy).toBe('fetch')
@@ -125,6 +129,7 @@ describe('agent-fetch engine', () => {
     })
 
     expect(result.strategy).toBe('agent-browser')
+    expect(result.content).toContain('# Authenticated Page')
     expect(result.attempts).toHaveLength(1)
     const [browserAttempt] = result.attempts
     expect(browserAttempt?.strategy).toBe('agent-browser')
@@ -154,5 +159,26 @@ describe('agent-fetch engine', () => {
     } finally {
       delete process.env.MOCK_AGENT_BROWSER_FAIL_OPEN
     }
+  })
+
+  it('returns structured output for portal pages', async () => {
+    const result = await fetchUrl(`${baseUrl}/portal`, {
+      strategyMode: 'simple',
+      outputMode: 'structured',
+      enableAgentBrowser: false,
+      enableJsdom: false,
+      enablePlugins: false,
+      minHtmlLength: 20,
+      minWordCount: 5,
+      minMarkdownLength: 20,
+    })
+
+    expect(result.outputMode).toBe('structured')
+    expect(result.markdown).toContain('## [News]')
+    expect(result.markdown).toContain('## [Markets]')
+    expect(result.markdown).not.toContain('Risk Disclosure')
+    expect(
+      result.structuredContent?.sections.some((section) => section.heading === 'News'),
+    ).toBe(true)
   })
 })

@@ -11,8 +11,13 @@ export type {
   FetchOptions,
   FetchResult,
   FetchStrategy,
+  OutputMode,
   PluginConfig,
   StrategyMode,
+  StructuredContent,
+  StructuredHeading,
+  StructuredLink,
+  StructuredSection,
 } from './core/types.js'
 export { registerPlugin, listBuiltinPlugins } from './plugins/registry.js'
 export type { FetchPlugin } from './plugins/types.js'
