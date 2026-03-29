@@ -1,6 +1,6 @@
 import { JSDOM, VirtualConsole } from 'jsdom'
-import { DEFAULT_TIMEOUT_MS, DEFAULT_USER_AGENT } from '../core/http.js'
-import type { FetchEngineContext } from '../core/types.js'
+import { DEFAULT_TIMEOUT_MS, DEFAULT_USER_AGENT } from '../core/http'
+import type { FetchEngineContext } from '../core/types'
 
 export const runJsdomStrategy = async (
   url: string,

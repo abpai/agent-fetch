@@ -1,6 +1,6 @@
-import type { PluginConfig } from '../core/types.js'
-import { scrapeDoPlugin } from './scrape-do.js'
-import type { BuiltinPluginSpec, FetchPlugin } from './types.js'
+import type { PluginConfig } from '../core/types'
+import { scrapeDoPlugin } from './scrape-do'
+import type { BuiltinPluginSpec, FetchPlugin } from './types'
 
 interface BuiltinPluginDefinition {
   plugin: FetchPlugin

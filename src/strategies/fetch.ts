@@ -1,5 +1,5 @@
-import { DEFAULT_TIMEOUT_MS, createTimeoutSignal } from '../core/http.js'
-import type { FetchEngineContext } from '../core/types.js'
+import { DEFAULT_TIMEOUT_MS, createTimeoutSignal } from '../core/http'
+import type { FetchEngineContext } from '../core/types'
 
 export const runFetchStrategy = async (
   url: string,

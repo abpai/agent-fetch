@@ -1,5 +1,5 @@
-import { createTimeoutSignal } from '../core/http.js'
-import type { FetchPlugin } from './types.js'
+import { createTimeoutSignal } from '../core/http'
+import type { FetchPlugin } from './types'
 
 export const scrapeDoPlugin: FetchPlugin = {
   name: 'scrape-do',

@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
-import { runCli } from './cli/index.js'
+import { runCli } from './cli/index'
 
-export { parseCliArgs, runCli } from './cli/index.js'
-export { fetchUrl } from './core/fetch-engine.js'
-export { FetchError } from './core/types.js'
+export { parseCliArgs, runCli } from './cli/index'
+export { fetchUrl } from './core/fetch-engine'
+export { FetchError } from './core/types'
 export type {
   AgentBrowserOptions,
   FetchAttempt,
@@ -18,9 +18,9 @@ export type {
   StructuredHeading,
   StructuredLink,
   StructuredSection,
-} from './core/types.js'
-export { registerPlugin, listBuiltinPlugins } from './plugins/registry.js'
-export type { FetchPlugin } from './plugins/types.js'
+} from './core/types'
+export { registerPlugin, listBuiltinPlugins } from './plugins/registry'
+export type { FetchPlugin } from './plugins/types'
 
 if (import.meta.main) {
   const exitCode = await runCli(Bun.argv.slice(2))

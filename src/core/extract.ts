@@ -10,7 +10,7 @@ import type {
   StructuredHeading,
   StructuredLink,
   StructuredSection,
-} from './types.js'
+} from './types'
 
 const turndown = new TurndownService({
   headingStyle: 'atx',

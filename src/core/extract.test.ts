@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { extractFromHtml } from './extract.js'
+import { extractFromHtml } from './extract'
 
 const ARTICLE_HTML = `<!DOCTYPE html>
 <html>

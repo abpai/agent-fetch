@@ -1,4 +1,4 @@
-import type { FetchOptions, FetchResult } from './types.js'
+import type { FetchOptions, FetchResult } from './types'
 
 const DEFAULT_MIN_HTML_LENGTH = 200
 const DEFAULT_MIN_MARKDOWN_LENGTH = 100

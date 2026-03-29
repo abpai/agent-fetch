@@ -1,5 +1,5 @@
-import { listBuiltinPlugins } from '../../plugins/registry.js'
-import type { PluginsListCommand } from '../types.js'
+import { listBuiltinPlugins } from '../../plugins/registry'
+import type { PluginsListCommand } from '../types'
 
 interface PluginsListDependencies {
   output: (message: string) => void

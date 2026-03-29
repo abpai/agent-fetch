@@ -1,4 +1,4 @@
-import type { AgentBrowserOptions, OutputMode, PluginConfig } from '../core/types.js'
+import type { AgentBrowserOptions, OutputMode, PluginConfig } from '../core/types'
 
 export interface AgentFetchConfig {
   outputMode?: OutputMode
