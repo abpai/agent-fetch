@@ -1,10 +1,11 @@
-import type { OutputMode } from '../core/types.js'
+import type { OutputMode } from '../core/types'
 
 export interface FetchCommand {
   command: 'fetch'
   url: string
   json: boolean
   configPath?: string
+  profile?: string
   outputMode?: OutputMode
   noJsdom: boolean
   noPlugins: boolean

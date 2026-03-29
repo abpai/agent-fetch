@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { loadRuntimeConfig } from './loader.js'
+import { loadRuntimeConfig } from './loader'
 
 const createdDirs: string[] = []
 const originalCwd = process.cwd()
@@ -17,6 +17,7 @@ afterEach(() => {
   process.chdir(originalCwd)
   delete process.env.AGENT_FETCH_TIMEOUT
   delete process.env.AGENT_FETCH_OUTPUT_MODE
+  delete process.env.AGENT_FETCH_PROFILE
 })
 
 describe('runtime config loader', () => {
@@ -70,5 +71,21 @@ describe('runtime config loader', () => {
         envFilePath: path.join(dir, '.env'),
       }),
     ).rejects.toThrow('Legacy config file detected')
+  })
+
+  it('loads AGENT_FETCH_PROFILE from the shared env file', async () => {
+    const dir = makeTempDir()
+    const configPath = path.join(dir, 'agent-fetch.config.json')
+    const envPath = path.join(dir, '.env')
+
+    writeFileSync(envPath, 'AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work\n')
+
+    const runtime = await loadRuntimeConfig({
+      configPath,
+      envFilePath: envPath,
+    })
+
+    expect(runtime.config.agentBrowser?.profile).toBe('~/.agent-browser/profiles/work')
+    expect(runtime.environment.AGENT_FETCH_PROFILE).toBe('~/.agent-browser/profiles/work')
   })
 })

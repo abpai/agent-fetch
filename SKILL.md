@@ -49,13 +49,13 @@ agent-fetch setup
 agent-fetch init
 
 # Non-interactive
-AGENT_FETCH_CDP_PORT=9222 agent-fetch setup --no-input --overwrite
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work agent-fetch setup --no-input --overwrite
 ```
 
 `setup` writes (by default):
 
 - `~/.config/agent-fetch/config.json`
-- `~/.config/agent-fetch/.env`
+- `~/.agent-fetch/.env`
 
 ## Plugins
 

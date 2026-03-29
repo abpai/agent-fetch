@@ -2,18 +2,17 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { parseCliArgs, runCli } from './cli/index.js'
+import { parseCliArgs, runCli } from './cli/index'
 
 const originalEnv = {
-  AGENT_FETCH_CDP_PORT: process.env.AGENT_FETCH_CDP_PORT,
-  AGENT_FETCH_CDP_LAUNCH: process.env.AGENT_FETCH_CDP_LAUNCH,
+  AGENT_FETCH_PROFILE: process.env.AGENT_FETCH_PROFILE,
   AGENT_FETCH_ENABLE_AGENT_BROWSER: process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER,
   AGENT_FETCH_ENABLE_PLUGINS: process.env.AGENT_FETCH_ENABLE_PLUGINS,
   SCRAPEDO_TOKEN: process.env.SCRAPEDO_TOKEN,
 }
 
 async function importSetupModule() {
-  return await import('./cli/commands/setup.js')
+  return await import('./cli/commands/setup')
 }
 
 afterEach(() => {
@@ -32,6 +31,8 @@ describe('agent-fetch CLI parsing', () => {
       'fetch',
       'https://example.com',
       '--json',
+      '--profile',
+      '/tmp/profile',
       '--no-jsdom',
       '--no-plugins',
       '--timeout',
@@ -46,6 +47,7 @@ describe('agent-fetch CLI parsing', () => {
       url: 'https://example.com',
       json: true,
       configPath: undefined,
+      profile: '/tmp/profile',
       outputMode: undefined,
       noJsdom: true,
       noPlugins: true,
@@ -72,6 +74,7 @@ describe('agent-fetch CLI parsing', () => {
       url: 'https://example.com',
       json: true,
       configPath: undefined,
+      profile: undefined,
       outputMode: 'html',
       noJsdom: false,
       noPlugins: false,
@@ -183,10 +186,9 @@ describe('agent-fetch setup', () => {
       ),
     )
 
-    process.env.AGENT_FETCH_CDP_PORT = '9222'
     process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'true'
     process.env.AGENT_FETCH_ENABLE_PLUGINS = 'false'
-    delete process.env.AGENT_FETCH_CDP_LAUNCH
+    process.env.AGENT_FETCH_PROFILE = '/tmp/test-profile'
     delete process.env.SCRAPEDO_TOKEN
 
     const { runSetupCommand } = await importSetupModule()

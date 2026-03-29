@@ -1,12 +1,12 @@
-import { validateResult } from './acceptance.js'
-import { extractFromHtml } from './extract.js'
-import { buildHeaders, DEFAULT_TIMEOUT_MS } from './http.js'
-import type { FetchAttempt, FetchOptions, FetchResult, StrategyMode } from './types.js'
-import { FetchError } from './types.js'
-import { resolvePlugins } from '../plugins/registry.js'
-import { runFetchStrategy } from '../strategies/fetch.js'
-import { runJsdomStrategy } from '../strategies/jsdom.js'
-import { runAgentBrowserStrategy } from '../strategies/agent-browser.js'
+import { validateResult } from './acceptance'
+import { extractFromHtml } from './extract'
+import { buildHeaders, DEFAULT_TIMEOUT_MS } from './http'
+import type { FetchAttempt, FetchOptions, FetchResult, StrategyMode } from './types'
+import { FetchError } from './types'
+import { resolvePlugins } from '../plugins/registry'
+import { runFetchStrategy } from '../strategies/fetch'
+import { runJsdomStrategy } from '../strategies/jsdom'
+import { runAgentBrowserStrategy } from '../strategies/agent-browser'
 
 const pickMode = (options: FetchOptions): StrategyMode => {
   if (options.withCredentials) {
@@ -45,8 +45,7 @@ const ensureNotSimpleFailure = (mode: StrategyMode, attempts: FetchAttempt[]): v
 }
 
 const isCredentialsMissingError = (message: string): boolean =>
-  message.includes('credentials not configured') ||
-  message.includes('Missing AGENT_FETCH_CDP_PORT')
+  message.includes('Missing AGENT_FETCH_PROFILE')
 
 const timed = async <T>(
   fn: () => Promise<T>,
@@ -87,7 +86,7 @@ const throwAllFailed = (attempts: FetchAttempt[]): never => {
 
 const throwAuthenticatedFailure = (attempts: FetchAttempt[]): never => {
   throw new FetchError(
-    'Authenticated fetch failed via agent-browser. Verify `agent-fetch setup` and AGENT_FETCH_CDP_PORT configuration.',
+    'Authenticated fetch failed via agent-browser. Verify `agent-fetch setup`, `--profile`, or AGENT_FETCH_PROFILE configuration.',
     attempts,
   )
 }

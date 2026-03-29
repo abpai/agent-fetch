@@ -10,11 +10,11 @@ import {
 } from '@clack/prompts'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { readEnvFile, writeEnvFile } from '../../config/env-file.js'
-import { getDefaultConfigPath, getDefaultEnvPath } from '../../config/loader.js'
-import type { AgentFetchConfig } from '../../config/types.js'
-import type { OutputMode, StrategyMode } from '../../core/types.js'
-import type { SetupCommand } from '../types.js'
+import { readEnvFile, writeEnvFile } from '../../config/env-file'
+import { getDefaultConfigPath, getDefaultEnvPath } from '../../config/loader'
+import type { AgentFetchConfig } from '../../config/types'
+import type { OutputMode, StrategyMode } from '../../core/types'
+import type { SetupCommand } from '../types'
 
 const DEFAULT_CONFIG: AgentFetchConfig = {
   timeout: 30_000,
@@ -26,8 +26,7 @@ const DEFAULT_CONFIG: AgentFetchConfig = {
   plugins: [],
 }
 
-const DEFAULT_CDP_PORT = '9222'
-const DEFAULT_CDP_LAUNCH = 'open -na "Google Chrome" --args --remote-debugging-port=9222'
+const DEFAULT_PROFILE_PATH = '~/.agent-browser/profiles/default'
 const SETUP_CANCELED_MESSAGE = 'Setup canceled.'
 
 interface SetupArtifacts {
@@ -47,17 +46,11 @@ const resolvePath = (value: string): string => {
   return value
 }
 
-const buildEnvValues = (
-  cdpPort: string,
-  cdpLaunch: string,
-  command?: string,
-): Record<string, string> => {
-  const values: Record<string, string> = {
-    AGENT_FETCH_CDP_PORT: cdpPort,
-  }
+const buildEnvValues = (profile: string, command?: string): Record<string, string> => {
+  const values: Record<string, string> = {}
 
-  if (cdpLaunch) {
-    values.AGENT_FETCH_CDP_LAUNCH = cdpLaunch
+  if (profile.trim()) {
+    values.AGENT_FETCH_PROFILE = profile.trim()
   }
 
   if (command?.trim()) {
@@ -266,19 +259,29 @@ const writeConfigFile = async (
 }
 
 const confirmOverwriteIfNeeded = async (
-  filePath: string,
+  filePaths: string[],
   overwrite: boolean,
 ): Promise<boolean> => {
   if (overwrite) {
     return true
   }
 
-  if (!(await fileExists(filePath))) {
+  const existingPaths: string[] = []
+  for (const filePath of filePaths) {
+    if (await fileExists(filePath)) {
+      existingPaths.push(filePath)
+    }
+  }
+
+  if (existingPaths.length === 0) {
     return true
   }
 
   const result = await confirm({
-    message: `${filePath} already exists. Overwrite it?`,
+    message:
+      existingPaths.length === 1
+        ? `${existingPaths[0]} already exists. Overwrite setup files?`
+        : 'Setup files already exist. Overwrite them?',
     initialValue: false,
   })
 
@@ -336,20 +339,16 @@ const buildArtifactsFromEnv = (): SetupArtifacts => {
 
   const envValues: Record<string, string> = {}
   if (enableAgentBrowser) {
-    const cdpPort = (process.env.AGENT_FETCH_CDP_PORT ?? '').trim()
-    if (!cdpPort) {
+    const profile = (process.env.AGENT_FETCH_PROFILE ?? '').trim()
+    if (strategyMode === 'authenticated' && !profile) {
       throw new Error(
-        'Missing environment value: AGENT_FETCH_CDP_PORT. Export it, then rerun `agent-fetch setup --no-input`.',
+        'Missing environment value: AGENT_FETCH_PROFILE. Export it, then rerun `agent-fetch setup --no-input`.',
       )
     }
 
     Object.assign(
       envValues,
-      buildEnvValues(
-        cdpPort,
-        (process.env.AGENT_FETCH_CDP_LAUNCH ?? '').trim(),
-        process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND,
-      ),
+      buildEnvValues(profile, process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND),
     )
   }
 
@@ -536,56 +535,50 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
     ) as boolean
   }
 
-  const currentPort =
-    existingEnv.AGENT_FETCH_CDP_PORT ??
-    process.env.AGENT_FETCH_CDP_PORT ??
-    currentConfig.agentBrowser?.cdpPort ??
-    DEFAULT_CDP_PORT
-  const currentLaunch =
-    existingEnv.AGENT_FETCH_CDP_LAUNCH ??
-    process.env.AGENT_FETCH_CDP_LAUNCH ??
-    currentConfig.agentBrowser?.cdpLaunch ??
-    DEFAULT_CDP_LAUNCH
+  const currentProfile =
+    existingEnv.AGENT_FETCH_PROFILE ??
+    process.env.AGENT_FETCH_PROFILE ??
+    currentConfig.agentBrowser?.profile ??
+    DEFAULT_PROFILE_PATH
+  const currentAgentBrowserCommand =
+    existingEnv.AGENT_FETCH_AGENT_BROWSER_COMMAND ??
+    process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND ??
+    currentConfig.agentBrowser?.command
 
-  const cdpPort = enableAgentBrowser
-    ? await promptRequiredText({
-        message:
-          process.env.AGENT_FETCH_CDP_PORT || existingEnv.AGENT_FETCH_CDP_PORT
-            ? 'AGENT_FETCH_CDP_PORT (current value available)'
-            : 'AGENT_FETCH_CDP_PORT',
-        placeholder: DEFAULT_CDP_PORT,
-        initialValue: currentPort,
-        validate: (value) =>
-          /^\d+$/.test(value) ? undefined : 'Enter a valid numeric CDP port, e.g. 9222.',
-      })
+  const profile = enableAgentBrowser
+    ? strategyMode === 'authenticated'
+      ? await promptRequiredText({
+          message:
+            process.env.AGENT_FETCH_PROFILE || existingEnv.AGENT_FETCH_PROFILE
+              ? 'AGENT_FETCH_PROFILE (current value available)'
+              : 'AGENT_FETCH_PROFILE',
+          placeholder: DEFAULT_PROFILE_PATH,
+          initialValue: currentProfile,
+          validate: (value) =>
+            value.trim().length > 0 ? undefined : 'Profile path is required.',
+        })
+      : await promptOptionalText({
+          message:
+            process.env.AGENT_FETCH_PROFILE || existingEnv.AGENT_FETCH_PROFILE
+              ? 'AGENT_FETCH_PROFILE (optional, current value available)'
+              : 'AGENT_FETCH_PROFILE (optional)',
+          placeholder: DEFAULT_PROFILE_PATH,
+          initialValue: currentProfile,
+        })
     : ''
 
-  const cdpLaunch = enableAgentBrowser
-    ? await promptOptionalText({
-        message:
-          process.env.AGENT_FETCH_CDP_LAUNCH || existingEnv.AGENT_FETCH_CDP_LAUNCH
-            ? 'AGENT_FETCH_CDP_LAUNCH (optional, current value available)'
-            : 'AGENT_FETCH_CDP_LAUNCH (optional)',
-        placeholder: DEFAULT_CDP_LAUNCH,
-        initialValue: currentLaunch,
-      })
-    : ''
-
-  const shouldWriteEnv = await confirmOverwriteIfNeeded(envFilePath, command.overwrite)
-  if (!shouldWriteEnv) {
-    outro('No changes made.')
-    return
-  }
-
-  const shouldWriteConfig = await confirmOverwriteIfNeeded(configPath, command.overwrite)
-  if (!shouldWriteConfig) {
+  const shouldWriteFiles = await confirmOverwriteIfNeeded(
+    [envFilePath, configPath],
+    command.overwrite,
+  )
+  if (!shouldWriteFiles) {
     outro('No changes made.')
     return
   }
 
   const envValues: Record<string, string> = {}
   if (enableAgentBrowser) {
-    Object.assign(envValues, buildEnvValues(cdpPort, cdpLaunch))
+    Object.assign(envValues, buildEnvValues(profile, currentAgentBrowserCommand))
   }
   if (enablePlugins && scrapeDoToken) {
     addEnvValue(envValues, 'SCRAPEDO_TOKEN', scrapeDoToken)

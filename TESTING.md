@@ -177,26 +177,26 @@ SCRAPEDO_TOKEN=your_actual_token agent-fetch fetch https://news.ycombinator.com 
 ```bash
 # Interactive setup (requires TTY)
 agent-fetch setup
-# Enter: 9222 for CDP port, optional launch command
-# Creates ~/.config/agent-fetch/config.json and ~/.config/agent-fetch/.env
+# Enter: browser profile path when configuring authenticated browser access
+# Creates ~/.config/agent-fetch/config.json and ~/.agent-fetch/.env
 
 # Verify
 cat ~/.config/agent-fetch/config.json
-cat ~/.config/agent-fetch/.env
+cat ~/.agent-fetch/.env
 
 # Non-interactive setup
-AGENT_FETCH_CDP_PORT=9222 agent-fetch setup --no-input --overwrite
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work agent-fetch setup --no-input --overwrite
 
 # Non-interactive without required env (should fail)
 agent-fetch setup --no-input
-# Error: "Missing environment value: AGENT_FETCH_CDP_PORT"
+# Error: "Missing environment value: AGENT_FETCH_PROFILE"
 
-# With launch command
-AGENT_FETCH_CDP_PORT=9222 \
-AGENT_FETCH_CDP_LAUNCH='open -na "Google Chrome" --args --remote-debugging-port=9222' \
+# With explicit command override
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
+AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser \
   agent-fetch setup --no-input --overwrite
-cat ~/.config/agent-fetch/.env
-# Should contain both AGENT_FETCH_CDP_PORT and AGENT_FETCH_CDP_LAUNCH
+cat ~/.agent-fetch/.env
+# Should contain AGENT_FETCH_PROFILE
 ```
 
 ---
@@ -204,11 +204,8 @@ cat ~/.config/agent-fetch/.env
 ## Step 7: Authenticated mode (agent-browser)
 
 ```bash
-# Launch Chrome with CDP
-open -na "Google Chrome" --args --remote-debugging-port=9222
-
-# Set the port
-export AGENT_FETCH_CDP_PORT=9222
+# Set the profile
+export AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work
 
 # Authenticated fetch
 agent-fetch fetch https://example.com --with-credentials --json --debug-attempts
@@ -217,13 +214,16 @@ agent-fetch fetch https://example.com --with-credentials --json --debug-attempts
 # Equivalent via --strategy flag
 agent-fetch fetch https://example.com --strategy authenticated --json
 
-# Fail-fast test (wrong port)
-AGENT_FETCH_CDP_PORT=9999 agent-fetch fetch https://example.com --with-credentials --json
+# One-off profile override
+agent-fetch fetch https://example.com --with-credentials --profile ~/.agent-browser/profiles/work --json
+
+# Fail-fast test (missing profile)
+env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials --json
 # Immediate failure: "Authenticated fetch failed via agent-browser"
 
 # Verify exit code
 agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 0
-AGENT_FETCH_CDP_PORT=9999 agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 1
+env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 1
 ```
 
 ---

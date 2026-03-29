@@ -1,8 +1,8 @@
-import { loadRuntimeConfig } from '../../config/loader.js'
-import { fetchUrl } from '../../core/fetch-engine.js'
-import { FetchError } from '../../core/types.js'
-import type { OutputMode, StrategyMode } from '../../core/types.js'
-import type { FetchCommand } from '../types.js'
+import { loadRuntimeConfig } from '../../config/loader'
+import { fetchUrl } from '../../core/fetch-engine'
+import { FetchError } from '../../core/types'
+import type { OutputMode, StrategyMode } from '../../core/types'
+import type { FetchCommand } from '../types'
 
 interface FetchCommandDependencies {
   output: (message: string) => void
@@ -68,6 +68,10 @@ export const runFetchCommand = async (
       plugins: runtime.config.plugins ?? [],
       blockedTextPatterns: runtime.config.blockedTextPatterns,
       environment: runtime.environment,
+      agentBrowser: {
+        ...runtime.config.agentBrowser,
+        ...(command.profile ? { profile: command.profile } : {}),
+      },
     }
 
     const result = await fetchUrl(command.url, options)

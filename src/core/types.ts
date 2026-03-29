@@ -83,8 +83,7 @@ export interface FetchEngineContext {
 }
 
 export interface AgentBrowserOptions {
-  cdpPort?: string
-  cdpLaunch?: string
+  profile?: string
   command?: string
 }
 

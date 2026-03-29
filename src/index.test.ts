@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { fetchUrl, FetchError, registerPlugin } from './index.js'
+import { fetchUrl, FetchError, registerPlugin } from './index'
 
 const BASE_HTML = `<!DOCTYPE html><html><head><title>Example Domain</title></head><body><article><h1>Example Domain</h1><p>This domain is for use in illustrative examples in documents.</p></article></body></html>`
 
@@ -120,7 +120,7 @@ describe('agent-fetch engine', () => {
       enablePlugins: true,
       plugins: [{ type: 'scrape-do', token: 'unused' }],
       agentBrowser: {
-        cdpPort: '9222',
+        profile: '/tmp/test-profile',
         command: mockAgentBrowserPath,
       },
       minHtmlLength: 20,
@@ -143,7 +143,7 @@ describe('agent-fetch engine', () => {
       await fetchUrl(baseUrl, {
         withCredentials: true,
         agentBrowser: {
-          cdpPort: '9222',
+          profile: '/tmp/test-profile',
           command: mockAgentBrowserPath,
         },
       })

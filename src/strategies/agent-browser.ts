@@ -1,6 +1,6 @@
+import { DEFAULT_TIMEOUT_MS } from '../core/http'
+import type { FetchEngineContext } from '../core/types'
 import { spawn } from 'node:child_process'
-import { DEFAULT_TIMEOUT_MS } from '../core/http.js'
-import type { FetchEngineContext } from '../core/types.js'
 
 interface CommandResult {
   code: number
@@ -45,16 +45,6 @@ const runCommand = async (
   })
 }
 
-const runLaunchCommand = (launchCommand: string): void => {
-  const shell = process.env.SHELL || 'sh'
-  const launched = spawn(shell, ['-lc', launchCommand], {
-    detached: true,
-    stdio: 'ignore',
-    env: process.env,
-  })
-  launched.unref()
-}
-
 const commandFailed = (action: string, result: CommandResult): never => {
   const stderr = result.stderr.trim()
   const stdout = result.stdout.trim()
@@ -76,34 +66,32 @@ const runCheckedCommand = async (
   return result
 }
 
-const resolveConfiguredPort = (context: FetchEngineContext): string | undefined =>
-  context.options.agentBrowser?.cdpPort ||
-  context.environment.AGENT_FETCH_CDP_PORT ||
-  process.env.AGENT_FETCH_CDP_PORT
+const resolveProfile = (context: FetchEngineContext): string | undefined =>
+  context.options.agentBrowser?.profile ||
+  context.environment.AGENT_FETCH_PROFILE ||
+  process.env.AGENT_FETCH_PROFILE
 
-const resolveLaunchCommand = (context: FetchEngineContext): string | undefined =>
-  context.options.agentBrowser?.cdpLaunch ||
-  context.environment.AGENT_FETCH_CDP_LAUNCH ||
-  process.env.AGENT_FETCH_CDP_LAUNCH
-
-const parsePort = (rawPort: string): string => {
-  const normalized = rawPort.trim()
-  if (!/^\d+$/.test(normalized)) {
-    throw new Error(`Invalid AGENT_FETCH_CDP_PORT value: ${rawPort}`)
+const buildCommandArgs = (
+  profile: string | undefined,
+  args: string[],
+): string[] => {
+  if (!profile) {
+    return args
   }
-  return normalized
+
+  return ['--profile', profile, ...args]
 }
 
 const runWorkflow = async (
   command: string,
-  cdpPort: string,
+  profile: string | undefined,
   url: string,
   timeoutMs: number,
   waitForNetworkIdle: boolean,
 ): Promise<string> => {
   await runCheckedCommand(
     command,
-    ['--cdp', cdpPort, 'open', url],
+    buildCommandArgs(profile, ['open', url]),
     timeoutMs,
     'agent-browser open',
   )
@@ -111,14 +99,14 @@ const runWorkflow = async (
   const loadState = waitForNetworkIdle ? 'networkidle' : 'load'
   await runCheckedCommand(
     command,
-    ['--cdp', cdpPort, 'wait', '--load', loadState],
+    buildCommandArgs(profile, ['wait', '--load', loadState]),
     timeoutMs,
     'agent-browser wait',
   )
 
   const htmlResult = await runCheckedCommand(
     command,
-    ['--cdp', cdpPort, 'get', 'html', 'body'],
+    buildCommandArgs(profile, ['get', 'html', 'body']),
     timeoutMs,
     'agent-browser get html',
   )
@@ -138,33 +126,14 @@ export const runAgentBrowserStrategy = async (
 ): Promise<string> => {
   const command = context.options.agentBrowser?.command || 'agent-browser'
   const timeoutMs = context.options.timeout ?? DEFAULT_TIMEOUT_MS
-  const configuredPort = resolveConfiguredPort(context)
+  const profile = resolveProfile(context)?.trim() || undefined
 
-  if (!configuredPort) {
-    if (requireCredentials) {
-      throw new Error(
-        'Missing AGENT_FETCH_CDP_PORT for authenticated mode. Run `agent-fetch setup` or set AGENT_FETCH_CDP_PORT.',
-      )
-    }
-
-    throw new Error('agent-browser credentials not configured')
+  if (requireCredentials && !profile) {
+    throw new Error(
+      'Missing AGENT_FETCH_PROFILE for authenticated mode. Run `agent-fetch setup`, pass `--profile`, or set AGENT_FETCH_PROFILE.',
+    )
   }
 
-  const cdpPort = parsePort(configuredPort)
   const waitForNetworkIdle = context.options.waitForNetworkIdle ?? true
-
-  try {
-    return await runWorkflow(command, cdpPort, url, timeoutMs, waitForNetworkIdle)
-  } catch (error) {
-    const cdpLaunch = resolveLaunchCommand(context)
-
-    if (!cdpLaunch) {
-      throw error
-    }
-
-    runLaunchCommand(cdpLaunch)
-    await new Promise((resolve) => setTimeout(resolve, 2_500))
-
-    return runWorkflow(command, cdpPort, url, timeoutMs, waitForNetworkIdle)
-  }
+  return runWorkflow(command, profile, url, timeoutMs, waitForNetworkIdle)
 }

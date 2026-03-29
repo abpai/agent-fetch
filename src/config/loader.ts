@@ -1,16 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { readEnvFile } from './env-file.js'
-import type { AgentFetchConfig, RuntimeConfig } from './types.js'
-import type { OutputMode } from '../core/types.js'
+import { readEnvFile } from './env-file'
+import type { AgentFetchConfig, RuntimeConfig } from './types'
+import type { OutputMode } from '../core/types'
 
 const LEGACY_CONFIG_FILES = ['.fetchrc.json', 'fetch.config.json']
 const OUTPUT_MODES = ['markdown', 'primary', 'html', 'structured'] as const
 const STRATEGY_MODES = ['auto', 'simple', 'authenticated'] as const
 
 const DEFAULT_CONFIG_PATH = path.join(homedir(), '.config', 'agent-fetch', 'config.json')
-const DEFAULT_ENV_PATH = path.join(homedir(), '.config', 'agent-fetch', '.env')
+const DEFAULT_ENV_PATH = path.join(homedir(), '.agent-fetch', '.env')
 
 const toBoolean = (value: string | undefined): boolean | undefined => {
   if (value === undefined) {
@@ -65,8 +65,7 @@ const buildEnvOverrides = (environment: Record<string, string>): AgentFetchConfi
       environment.AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD,
     ),
     agentBrowser: {
-      cdpPort: environment.AGENT_FETCH_CDP_PORT,
-      cdpLaunch: environment.AGENT_FETCH_CDP_LAUNCH,
+      profile: environment.AGENT_FETCH_PROFILE,
       command: environment.AGENT_FETCH_AGENT_BROWSER_COMMAND,
     },
   }

@@ -1,14 +1,14 @@
 import { Command, CommanderError, InvalidArgumentError } from 'commander'
-import { runFetchCommand } from './commands/fetch.js'
-import { runPluginsListCommand } from './commands/plugins.js'
-import { runSetupCommand } from './commands/setup.js'
-import type { OutputMode } from '../core/types.js'
+import { runFetchCommand } from './commands/fetch'
+import { runPluginsListCommand } from './commands/plugins'
+import { runSetupCommand } from './commands/setup'
+import type { OutputMode } from '../core/types'
 import type {
   FetchCommand,
   ParsedCommand,
   PluginsListCommand,
   SetupCommand,
-} from './types.js'
+} from './types'
 
 interface RunCliDependencies {
   output?: (message: string) => void
@@ -164,6 +164,7 @@ function registerFetchCommand(
     .argument('<url>', 'URL to fetch')
     .option('--json', 'Output structured JSON result')
     .option('--config <path>', 'Path to config JSON file')
+    .option('--profile <path>', 'Persistent agent-browser profile path')
     .option('--no-jsdom', 'Disable jsdom fallback strategy')
     .option('--no-plugins', 'Disable plugin fallback strategies')
     .option('--no-agent-browser', 'Disable agent-browser fallback strategy')
@@ -190,6 +191,7 @@ function registerFetchCommand(
         options: {
           json?: boolean
           config?: string
+          profile?: string
           mode?: OutputMode
           jsdom?: boolean
           plugins?: boolean
@@ -205,6 +207,7 @@ function registerFetchCommand(
           url,
           json: options.json === true,
           configPath: options.config,
+          profile: options.profile,
           outputMode: options.mode,
           noJsdom: options.jsdom === false,
           noPlugins: options.plugins === false,
@@ -230,7 +233,7 @@ function registerSetupCommand(
       '--config <path>',
       'Config file path (default: ~/.config/agent-fetch/config.json)',
     )
-    .option('--env-file <path>', 'Env file path (default: ~/.config/agent-fetch/.env)')
+    .option('--env-file <path>', 'Env file path (default: ~/.agent-fetch/.env)')
     .option('--no-input', 'Disable interactive prompts')
     .option('--overwrite', 'Overwrite existing setup files')
     .action(

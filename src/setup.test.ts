@@ -13,8 +13,7 @@ const originalEnv = {
   AGENT_FETCH_ENABLE_PLUGINS: process.env.AGENT_FETCH_ENABLE_PLUGINS,
   AGENT_FETCH_ENABLE_AGENT_BROWSER: process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER,
   AGENT_FETCH_STRATEGY_MODE: process.env.AGENT_FETCH_STRATEGY_MODE,
-  AGENT_FETCH_CDP_PORT: process.env.AGENT_FETCH_CDP_PORT,
-  AGENT_FETCH_CDP_LAUNCH: process.env.AGENT_FETCH_CDP_LAUNCH,
+  AGENT_FETCH_PROFILE: process.env.AGENT_FETCH_PROFILE,
   AGENT_FETCH_AGENT_BROWSER_COMMAND: process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND,
   AGENT_FETCH_OUTPUT_MODE: process.env.AGENT_FETCH_OUTPUT_MODE,
   AGENT_FETCH_USER_AGENT: process.env.AGENT_FETCH_USER_AGENT,
@@ -33,7 +32,7 @@ function setTTY(enabled: boolean) {
 }
 
 async function importSetupModule() {
-  return await import('./cli/commands/setup.js')
+  return await import('./cli/commands/setup')
 }
 
 function restoreEnv() {
@@ -88,8 +87,7 @@ describe('agent-fetch setup wizard', () => {
           '80',
           '20',
           '10',
-          '9333',
-          'open -na "Google Chrome" --args --remote-debugging-port=9333',
+          '~/.agent-browser/profiles/test',
         ]
         return answers[prompts.text++] ?? ''
       },
@@ -134,7 +132,7 @@ describe('agent-fetch setup wizard', () => {
     expect(config.minWordCount).toBe(20)
     expect(config.blockedWordCountThreshold).toBe(10)
     expect(config.plugins).toEqual([{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }])
-    expect(envFile).toContain('AGENT_FETCH_CDP_PORT=9333')
+    expect(envFile).toContain('AGENT_FETCH_PROFILE="~/.agent-browser/profiles/test"')
     expect(envFile).toContain('SCRAPEDO_TOKEN=scrape-token-123')
   })
 
@@ -158,8 +156,7 @@ describe('agent-fetch setup wizard', () => {
     process.env.AGENT_FETCH_MIN_WORD_COUNT = '12'
     process.env.AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD = '6'
     process.env.SCRAPEDO_TOKEN = 'env-scrape-token'
-    delete process.env.AGENT_FETCH_CDP_PORT
-    delete process.env.AGENT_FETCH_CDP_LAUNCH
+    delete process.env.AGENT_FETCH_PROFILE
 
     const { runSetupCommand } = await importSetupModule()
     await runSetupCommand({
@@ -213,7 +210,7 @@ describe('agent-fetch setup wizard', () => {
 
     process.env.AGENT_FETCH_STRATEGY_MODE = 'authenticated'
     process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'true'
-    process.env.AGENT_FETCH_CDP_PORT = '9222'
+    process.env.AGENT_FETCH_PROFILE = '~/.agent-browser/profiles/auth'
     process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND = 'agent-browser'
 
     const { runSetupCommand } = await importSetupModule()
@@ -229,13 +226,62 @@ describe('agent-fetch setup wizard', () => {
     expect(envFile).toContain('AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser')
   })
 
-  it('requires AGENT_FETCH_CDP_PORT for authenticated no-input setup', async () => {
+  it('preserves an existing agent-browser command during interactive setup', async () => {
+    setTTY(true)
+    const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
+    tempDirs.push(tempDir)
+    const configPath = join(tempDir, 'config.json')
+    const envFilePath = join(tempDir, '.env')
+
+    await Bun.write(
+      envFilePath,
+      [
+        'AGENT_FETCH_PROFILE=~/.agent-browser/profiles/existing',
+        'AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser --sandbox',
+      ].join('\n') + '\n',
+    )
+
+    mock.module('@clack/prompts', () => ({
+      intro: () => {},
+      outro: () => {},
+      note: () => {},
+      cancel: () => {},
+      isCancel: () => false,
+      select: async () => 'auto',
+      confirm: (() => {
+        const answers = [true, true, false, false, false, true]
+        let index = 0
+        return async () => answers[index++] ?? true
+      })(),
+      text: (() => {
+        const answers = ['30000', '', '']
+        let index = 0
+        return async () => answers[index++] ?? ''
+      })(),
+    }))
+
+    const { runSetupCommand } = await importSetupModule()
+    await runSetupCommand({
+      command: 'setup',
+      configPath,
+      envFilePath,
+      noInput: false,
+      overwrite: false,
+    })
+
+    const envFile = await readFile(envFilePath, 'utf8')
+    expect(envFile).toContain(
+      'AGENT_FETCH_AGENT_BROWSER_COMMAND="agent-browser --sandbox"',
+    )
+  })
+
+  it('requires AGENT_FETCH_PROFILE for authenticated no-input setup', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
     tempDirs.push(tempDir)
 
     process.env.AGENT_FETCH_STRATEGY_MODE = 'authenticated'
     process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'true'
-    delete process.env.AGENT_FETCH_CDP_PORT
+    delete process.env.AGENT_FETCH_PROFILE
 
     const { runSetupCommand } = await importSetupModule()
 
@@ -247,7 +293,7 @@ describe('agent-fetch setup wizard', () => {
         noInput: true,
         overwrite: true,
       }),
-    ).rejects.toThrow('Missing environment value: AGENT_FETCH_CDP_PORT')
+    ).rejects.toThrow('Missing environment value: AGENT_FETCH_PROFILE')
   })
 
   it('throws without a TTY for interactive setup', async () => {
@@ -306,7 +352,7 @@ describe('agent-fetch setup wizard', () => {
         return async () => answers[index++] ?? true
       })(),
       text: (() => {
-        const answers = ['30000', '', '9222', '']
+        const answers = ['30000', '', '']
         let index = 0
         return async () => answers[index++] ?? ''
       })(),

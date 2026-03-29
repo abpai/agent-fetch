@@ -41,7 +41,7 @@ Config files:
 
 Shared env file:
 
-- `~/.config/agent-fetch/.env`
+- `~/.agent-fetch/.env`
 - optional override: `AGENT_FETCH_SHARED_ENV_PATH`
 
 Precedence:
@@ -52,8 +52,8 @@ Precedence:
 
 Credential keys:
 
-- `AGENT_FETCH_CDP_PORT` (required for authenticated mode)
-- `AGENT_FETCH_CDP_LAUNCH` (optional fallback launcher)
+- `AGENT_FETCH_PROFILE` (required for authenticated mode unless `--profile` is passed)
+- `AGENT_FETCH_AGENT_BROWSER_COMMAND` (optional command override)
 
 Legacy files are hard-rejected:
 
@@ -70,7 +70,7 @@ Legacy files are hard-rejected:
 - `src/cli/commands/fetch.ts`
   - runtime config + fetch engine execution
 - `src/cli/commands/setup.ts`
-  - guided/non-interactive setup for CDP credentials and defaults
+  - guided/non-interactive setup for browser profile credentials and defaults
 - `src/cli/commands/plugins.ts`
   - built-in plugin discovery output
 - `src/core/fetch-engine.ts`

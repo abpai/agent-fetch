@@ -49,6 +49,9 @@ agent-fetch fetch https://example.com --debug-attempts
 # Use an explicit config file
 agent-fetch fetch https://example.com --config /tmp/agent-fetch.json
 
+# Use a persistent browser profile for a one-off authenticated request
+agent-fetch fetch https://example.com --with-credentials --profile ~/.agent-browser/profiles/work
+
 # Disable fallback stages
 agent-fetch fetch https://example.com --no-jsdom --no-plugins
 
@@ -81,7 +84,7 @@ AGENT_FETCH_TIMEOUT=45000 \
 AGENT_FETCH_ENABLE_PLUGINS=true \
 SCRAPEDO_TOKEN=your-token \
 AGENT_FETCH_ENABLE_AGENT_BROWSER=true \
-AGENT_FETCH_CDP_PORT=9222 \
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
 agent-fetch setup --no-input --overwrite
 ```
 
@@ -91,7 +94,7 @@ The setup walkthrough can now configure:
 - timeout and content validation thresholds
 - fetch/jsdom/plugin/agent-browser fallbacks
 - optional scrape.do plugin wiring
-- authenticated browser CDP defaults
+- authenticated browser profile defaults
 - whether `agent-browser` waits for `networkidle` before extraction
 
 ### Plugins
@@ -109,9 +112,9 @@ Default config path:
 
 Default shared env path:
 
-- `~/.config/agent-fetch/.env`
+- `~/.agent-fetch/.env`
 
-The config file stores runtime defaults. The shared env file stores machine-specific values and secrets such as `AGENT_FETCH_CDP_PORT`, `AGENT_FETCH_CDP_LAUNCH`, and `SCRAPEDO_TOKEN`.
+The config file stores runtime defaults. The shared env file stores machine-specific values and secrets such as `AGENT_FETCH_PROFILE`, `AGENT_FETCH_AGENT_BROWSER_COMMAND`, and `SCRAPEDO_TOKEN`.
 
 At runtime, precedence is:
 
@@ -150,8 +153,7 @@ Notes:
 Example shared env file:
 
 ```bash
-AGENT_FETCH_CDP_PORT=9222
-AGENT_FETCH_CDP_LAUNCH='open -na "Google Chrome" --args --remote-debugging-port=9222'
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work
 SCRAPEDO_TOKEN=your-token
 ```
 
@@ -179,8 +181,7 @@ Move settings to `~/.config/agent-fetch/config.json`.
 - `AGENT_FETCH_MIN_MARKDOWN_LENGTH`
 - `AGENT_FETCH_MIN_WORD_COUNT`
 - `AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD`
-- `AGENT_FETCH_CDP_PORT`
-- `AGENT_FETCH_CDP_LAUNCH`
+- `AGENT_FETCH_PROFILE`
 - `AGENT_FETCH_AGENT_BROWSER_COMMAND`
 - `SCRAPEDO_TOKEN`
 
