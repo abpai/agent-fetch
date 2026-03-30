@@ -102,8 +102,38 @@ describe('agent-fetch CLI parsing', () => {
     })
   })
 
+  it('parses init alias as setup command', () => {
+    const parsed = parseCliArgs(['init', '--no-input'])
+
+    expect(parsed).toEqual({
+      command: 'setup',
+      configPath: undefined,
+      envFilePath: undefined,
+      noInput: true,
+      overwrite: false,
+    })
+  })
+
   it('parses plugins list command', () => {
     const parsed = parseCliArgs(['plugins', 'list', '--json'])
+
+    expect(parsed).toEqual({
+      command: 'plugins-list',
+      json: true,
+    })
+  })
+
+  it('parses bare plugins command as list shorthand', () => {
+    const parsed = parseCliArgs(['plugins'])
+
+    expect(parsed).toEqual({
+      command: 'plugins-list',
+      json: false,
+    })
+  })
+
+  it('parses bare plugins json shorthand', () => {
+    const parsed = parseCliArgs(['plugins', '--json'])
 
     expect(parsed).toEqual({
       command: 'plugins-list',
@@ -124,6 +154,21 @@ describe('agent-fetch CLI run', () => {
 
     expect(code).toBe(0)
     expect(output.join('\n')).toContain('agent-fetch')
+    expect(error).toHaveLength(0)
+  })
+
+  it('prints fetch help including screenshot mode', async () => {
+    const output: string[] = []
+    const error: string[] = []
+
+    const code = await runCli(['fetch', '--help'], {
+      output: (message) => output.push(message),
+      error: (message) => error.push(message),
+    })
+
+    expect(code).toBe(0)
+    expect(output.join('\n')).toContain('Output mode: markdown, primary, html, structured')
+    expect(output.join('\n')).toContain('screenshot')
     expect(error).toHaveLength(0)
   })
 
@@ -203,6 +248,22 @@ describe('agent-fetch CLI run', () => {
     expect(error).toEqual([
       '`authenticated` mode cannot be combined with `--no-agent-browser`.',
     ])
+  })
+
+  it('runs bare plugins command as list output', async () => {
+    const output: string[] = []
+    const error: string[] = []
+
+    const code = await runCli(['plugins'], {
+      output: (message) => output.push(message),
+      error: (message) => error.push(message),
+    })
+
+    expect(code).toBe(0)
+    expect(output).toHaveLength(1)
+    expect(output[0]).toContain('Built-in plugins:')
+    expect(output[0]).toContain('scrape-do')
+    expect(error).toHaveLength(0)
   })
 })
 

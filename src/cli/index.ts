@@ -115,7 +115,28 @@ function normalizeCliArgs(argv: string[]): string[] {
     return argv
   }
 
+  if (shouldUsePluginsListShorthand(argv)) {
+    return ['plugins', 'list', ...argv.slice(1)]
+  }
+
   return isLikelyUrl(argv[0]) ? ['fetch', ...argv] : argv
+}
+
+function shouldUsePluginsListShorthand(argv: string[]): boolean {
+  if (argv[0] !== 'plugins') {
+    return false
+  }
+
+  const trailingArgs = argv.slice(1)
+  if (trailingArgs.length === 0) {
+    return true
+  }
+
+  if (trailingArgs.includes('-h') || trailingArgs.includes('--help')) {
+    return false
+  }
+
+  return trailingArgs.every((arg) => arg.startsWith('-'))
 }
 
 function isLikelyUrl(value: string | undefined): boolean {
@@ -175,7 +196,7 @@ function registerFetchCommand(
     .option('--no-agent-browser', 'Disable agent-browser fallback strategy')
     .option(
       '--mode <mode>',
-      'Output mode: markdown, primary, html, structured',
+      'Output mode: markdown, primary, html, structured, screenshot',
       parseOutputMode,
     )
     .option('--timeout <ms>', 'Timeout in milliseconds', positiveInt)
