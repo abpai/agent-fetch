@@ -11,7 +11,7 @@ It prioritizes low-cost extraction first and escalates only when needed, while k
 - CLI binary: `agent-fetch`
 - Core command: `agent-fetch fetch <url>`
 - Supporting commands: `agent-fetch setup` (alias: `agent-fetch init`), `agent-fetch plugins list`
-- Library API: `fetchUrl()`, `FetchError`, `registerPlugin()`, `listBuiltinPlugins()`
+- Library API: `fetchUrl()`, `FetchError`, `registerPlugin()`, `listBuiltinPlugins()`, `parseCliArgs()`, `runCli()`, plus public fetch/plugin types
 
 ## Strategy Modes
 
@@ -25,10 +25,19 @@ It prioritizes low-cost extraction first and escalates only when needed, while k
 - `primary`: article-style primary content via Readability, with metadata fallback for non-article pages
 - `html`: rendered HTML
 - `structured`: structured sections, headings, and links derived from markdown; CLI text output is a JSON string for this mode
+- `screenshot`: full-page screenshot path captured through `agent-browser`
+
+## Exact Method Override
+
+- `--method fetch`: run only the plain fetch strategy
+- `--method jsdom`: fetch once, then run only jsdom rendering
+- `--method agent-browser`: run only agent-browser
+- `--method scrape.do`: run only that configured plugin (normalized internally to `scrape-do`)
+- `--mode screenshot` is a special case that always routes through `agent-browser`
 
 ## Authenticated Fast Path
 
-When `--with-credentials` is passed, `agent-fetch` skips all non-authenticated stages and directly runs `agent-browser` with CDP credentials.
+When `--with-credentials` is passed, `agent-fetch` skips all non-authenticated stages and directly runs `agent-browser` with a persistent browser profile (`AGENT_FETCH_PROFILE` or `--profile`).
 
 If that fails, command exits non-zero with actionable error details and does not silently downgrade.
 
@@ -42,7 +51,8 @@ Config files:
 Shared env file:
 
 - `~/.agent-fetch/.env`
-- optional override: `AGENT_FETCH_SHARED_ENV_PATH`
+- optional runtime override: `AGENT_FETCH_SHARED_ENV_PATH`
+- optional setup write path: `agent-fetch setup --env-file <path>`
 
 Precedence:
 
@@ -70,11 +80,12 @@ Legacy files are hard-rejected:
 - `src/cli/commands/fetch.ts`
   - runtime config + fetch engine execution
 - `src/cli/commands/setup.ts`
-  - guided/non-interactive setup for browser profile credentials and defaults
+  - guided/non-interactive setup for browser profile defaults and runtime settings
 - `src/cli/commands/plugins.ts`
   - built-in plugin discovery output
 - `src/core/fetch-engine.ts`
   - strategy orchestration and attempt tracking
+  - exact-method execution (`--method`) and screenshot routing
   - authenticated fast path and acceptance-driven escalation
 - `src/core/acceptance.ts`
   - threshold + blocked/paywall checks used to reject weak results and continue fallback
@@ -93,7 +104,7 @@ Legacy files are hard-rejected:
 
 - Fetch failures throw `FetchError` with per-strategy `attempts[]`.
 - CLI prints actionable errors to `stderr` and returns non-zero exit.
-- `stdout` remains reserved for the selected content output (`markdown`, `primary`, `html`, `structured`) or JSON.
+- `stdout` remains reserved for the selected content output (`markdown`, `primary`, `html`, `structured`, `screenshot`) or JSON.
 - `--debug-attempts` prints per-attempt diagnostics to `stderr` on success too.
 
 ## Plugin Model (v1)

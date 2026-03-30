@@ -34,3 +34,14 @@
 ## 2026-03-27
 - `waitForNetworkIdle` now has a live runtime effect in `src/strategies/agent-browser.ts`; keep docs scoped to that strategy-specific behavior instead of describing it as a generic fetch-wide switch.
 - When refreshing docs in this repo, verify and document the library exports as well as the CLI surface; `src/index.ts` is part of the public contract.
+
+## 2026-03-29
+- Browser-auth setup in this repo is now profile-based, not CDP-based: use `AGENT_FETCH_PROFILE` / `--profile`, keep config JSON at `~/.config/agent-fetch/config.json`, and use `~/.agent-fetch/.env` as the only default shared env path.
+- When simplifying interactive setup here, treat config and env writes as one overwrite decision; separate prompts create noisy UX without adding useful safety.
+- Interactive setup should preserve any existing `AGENT_FETCH_AGENT_BROWSER_COMMAND` override when rewriting the shared env file; otherwise unrelated setup reruns silently drop custom browser command wiring.
+- For docs and test guides here, `agent-fetch setup --no-input` only requires `AGENT_FETCH_PROFILE` when `AGENT_FETCH_STRATEGY_MODE=authenticated`; general auto/simple setup can be validated without browser credentials.
+- In docs for this repo, distinguish runtime path overrides from setup write paths: `AGENT_FETCH_SHARED_ENV_PATH` affects runtime loading, while `agent-fetch setup --env-file` controls where setup writes the shared env file.
+- For docs in this repo, `agent-fetch setup --no-input` should only be described as requiring `AGENT_FETCH_PROFILE` when the requested defaults are authenticated; general non-interactive setup can run without browser profile env.
+- The README should include end-to-end profile creation commands (`agent-browser install`, `agent-browser --profile ... open <login-url>`), not just `AGENT_FETCH_PROFILE`, because first-time users otherwise do not know how to create the profile that setup expects.
+- Screenshot output is now an agent-browser-only path result: treat `outputMode: 'screenshot'` as bypassing text acceptance checks, and keep `content` aligned with `screenshotPath`.
+- Exact `--method` / `FetchOptions.method` overrides should run only the named stage; normalize dotted plugin names like `scrape.do` to the plugin type `scrape-do`.

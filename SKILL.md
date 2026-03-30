@@ -20,9 +20,16 @@ agent-fetch https://example.com
 agent-fetch fetch https://example.com --mode primary
 agent-fetch fetch https://example.com --mode html
 agent-fetch fetch https://example.com --mode structured
+agent-fetch fetch https://example.com --mode screenshot
 
 # JSON output
 agent-fetch fetch https://example.com --json
+
+# Exact method override
+agent-fetch fetch https://example.com --method fetch
+agent-fetch fetch https://example.com --method jsdom
+agent-fetch fetch https://example.com --method agent-browser
+agent-fetch fetch https://example.com --method scrape.do
 ```
 
 ## Strategy controls
@@ -50,6 +57,11 @@ agent-fetch init
 
 # Non-interactive
 AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work agent-fetch setup --no-input --overwrite
+
+# Authenticated defaults require a profile in non-interactive mode
+AGENT_FETCH_STRATEGY_MODE=authenticated \
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
+  agent-fetch setup --no-input --overwrite
 ```
 
 `setup` writes (by default):
@@ -70,3 +82,4 @@ agent-fetch plugins list --json
 - For `fetch`, errors and debug attempt details go to `stderr`.
 - Legacy config files (`.fetchrc.json`, `fetch.config.json`) are rejected with a hard error.
 - `--with-credentials` never silently downgrades to non-authenticated strategies.
+- `--mode screenshot` requires `agent-browser` and returns the saved screenshot path.

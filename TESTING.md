@@ -25,7 +25,7 @@ agent-fetch --help
 ## Step 1: Automated tests
 
 ```bash
-bun run check   # lint + typecheck
+bun run check   # prettier check + lint + typecheck + test
 bun run test    # bun test src
 ```
 
@@ -48,6 +48,8 @@ agent-fetch fetch https://x --mode bogus           # invalid output mode
 agent-fetch fetch https://x --timeout abc          # non-numeric timeout
 agent-fetch fetch https://x --with-credentials --no-agent-browser  # incompatible flags
 agent-fetch fetch https://x --strategy authenticated --no-agent-browser  # incompatible flags
+agent-fetch fetch https://x --mode screenshot --no-agent-browser   # incompatible flags
+agent-fetch fetch https://x --mode screenshot --method fetch       # incompatible flags
 ```
 
 Verify each error prints to stderr and exits with code 2.
@@ -68,6 +70,11 @@ agent-fetch fetch https://example.com --mode markdown
 agent-fetch fetch https://example.com --mode primary
 agent-fetch fetch https://example.com --mode html
 agent-fetch fetch https://example.com --mode structured
+agent-fetch fetch https://example.com --mode screenshot
+
+# Exact method overrides
+agent-fetch fetch https://example.com --method fetch
+agent-fetch fetch https://example.com --method jsdom
 
 # JSON output — verify all fields present
 agent-fetch fetch https://example.com --json
@@ -93,6 +100,14 @@ agent-fetch fetch https://example.com --mode html | head
 
 # Structured mode should emit JSON section data to stdout
 agent-fetch fetch https://example.com --mode structured
+
+# Screenshot mode should emit the saved image path to stdout
+agent-fetch fetch https://example.com --mode screenshot
+
+# Method override should limit execution to one stage
+AGENT_FETCH_MIN_WORD_COUNT=999999 agent-fetch fetch https://example.com --method fetch --json --debug-attempts 2>/tmp/attempts.txt
+cat /tmp/attempts.txt
+# Should show only one fetch attempt
 ```
 
 ---
@@ -100,7 +115,7 @@ agent-fetch fetch https://example.com --mode structured
 ## Step 4: Fetch — fallback chain (`auto` mode)
 
 ```bash
-# Force fetch to fail thresholds, jsdom should pick it up
+# Force fetch and jsdom to fail thresholds, with no later fallbacks enabled
 AGENT_FETCH_MIN_WORD_COUNT=999999 agent-fetch fetch https://example.com --no-plugins --no-agent-browser --json --debug-attempts 2>/tmp/attempts.txt
 # Should fail: "All fetch strategies failed"
 cat /tmp/attempts.txt
@@ -135,11 +150,11 @@ EOF
 # Fetch with plugin configured (auto mode will try fetch first, then jsdom, then scrape-do)
 agent-fetch fetch https://example.com --config /tmp/scrape-do-config.json --json --debug-attempts
 
-# Force scrape-do to be the only plugin that succeeds by raising thresholds
+# Raise thresholds to inspect attempt ordering and rejection behavior
 AGENT_FETCH_MIN_WORD_COUNT=999999 agent-fetch fetch https://example.com \
   --config /tmp/scrape-do-config.json --no-agent-browser --json --debug-attempts 2>/tmp/attempts.txt
 cat /tmp/attempts.txt
-# fetch: rejected, jsdom: rejected, scrape-do: rejected (if example.com is below 999999 words)
+# fetch: rejected, jsdom: rejected, scrape-do: rejected (for high enough thresholds)
 
 # Test with env var interpolation for token
 cat > /tmp/scrape-do-env-config.json << 'EOF'
@@ -175,28 +190,49 @@ SCRAPEDO_TOKEN=your_actual_token agent-fetch fetch https://news.ycombinator.com 
 ## Step 6: Setup command
 
 ```bash
+# Use isolated paths so the test does not touch your real setup files
+tmpdir="$(mktemp -d)"
+
 # Interactive setup (requires TTY)
-agent-fetch setup
+agent-fetch setup --config "$tmpdir/config.json" --env-file "$tmpdir/.env"
 # Enter: browser profile path when configuring authenticated browser access
-# Creates ~/.config/agent-fetch/config.json and ~/.agent-fetch/.env
+# Creates $tmpdir/config.json and $tmpdir/.env
 
 # Verify
-cat ~/.config/agent-fetch/config.json
-cat ~/.agent-fetch/.env
+cat "$tmpdir/config.json"
+cat "$tmpdir/.env"
 
-# Non-interactive setup
-AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work agent-fetch setup --no-input --overwrite
+# Non-interactive setup with general defaults only
+AGENT_FETCH_TIMEOUT=15000 \
+AGENT_FETCH_ENABLE_AGENT_BROWSER=false \
+  agent-fetch setup --no-input --overwrite \
+  --config "$tmpdir/config.json" \
+  --env-file "$tmpdir/.env"
 
-# Non-interactive without required env (should fail)
-agent-fetch setup --no-input
+# Authenticated non-interactive setup requires a profile
+AGENT_FETCH_STRATEGY_MODE=authenticated \
+AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
+  agent-fetch setup --no-input --overwrite \
+  --config "$tmpdir/config.json" \
+  --env-file "$tmpdir/.env"
+
+# Authenticated non-interactive setup without required env (should fail)
+env -u AGENT_FETCH_PROFILE \
+  AGENT_FETCH_STRATEGY_MODE=authenticated \
+  agent-fetch setup --no-input --overwrite \
+  --config "$tmpdir/config.json" \
+  --env-file "$tmpdir/.env"
 # Error: "Missing environment value: AGENT_FETCH_PROFILE"
 
 # With explicit command override
 AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
 AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser \
-  agent-fetch setup --no-input --overwrite
-cat ~/.agent-fetch/.env
-# Should contain AGENT_FETCH_PROFILE
+  AGENT_FETCH_STRATEGY_MODE=authenticated \
+  agent-fetch setup --no-input --overwrite \
+  --config "$tmpdir/config.json" \
+  --env-file "$tmpdir/.env"
+cat "$tmpdir/.env"
+# Should contain AGENT_FETCH_PROFILE and AGENT_FETCH_AGENT_BROWSER_COMMAND
 ```
 
 ---
@@ -217,13 +253,15 @@ agent-fetch fetch https://example.com --strategy authenticated --json
 # One-off profile override
 agent-fetch fetch https://example.com --with-credentials --profile ~/.agent-browser/profiles/work --json
 
-# Fail-fast test (missing profile)
-env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials --json
+# Fail-fast test (missing profile, ignoring any shared env defaults)
+AGENT_FETCH_SHARED_ENV_PATH=/tmp/agent-fetch-empty.env \
+  env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials --json
 # Immediate failure: "Authenticated fetch failed via agent-browser"
 
 # Verify exit code
 agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 0
-env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 1
+AGENT_FETCH_SHARED_ENV_PATH=/tmp/agent-fetch-empty.env \
+  env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 1
 ```
 
 ---
@@ -522,7 +560,7 @@ websocat ws://127.0.0.1:4500
 - [ ] `agent-fetch setup` runs interactive flow
 - [ ] `agent-fetch setup --no-input` works with env vars
 - [ ] `--with-credentials` uses agent-browser only
-- [ ] Authenticated fail-fast works (wrong port)
+- [ ] Authenticated fail-fast works (missing or invalid profile)
 - [ ] Config precedence: CLI > env > config file
 - [ ] Exit codes: 0 (success), 1 (fetch failure), 2 (arg error)
 - [ ] Library import works via `bun -e`
