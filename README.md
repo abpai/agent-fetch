@@ -1,19 +1,21 @@
 # agent-fetch
 
-`agent-fetch` is a robust fetch CLI for AI agents.
+A fetch CLI for AI agents.
 
-By default it returns a useful markdown view of the rendered page, closer to a broad page snapshot than an article-only extractor. You can switch to article-style output, raw HTML, or structured section data when you need something narrower or more mechanical.
+Fetching web pages programmatically has gotten messy. Cloudflare bot detection, server-side rendering, SPAs that return empty `<div>`s, paywalls — half the web blocks a plain `fetch` even when you aren't doing anything adversarial. You can throw a headless browser at every request, or route through a third-party scraping API, but that's wasteful when `curl` would've worked for most of your list.
 
-It tries the cheapest strategy first, then escalates when needed:
+`agent-fetch` tries the cheapest method first and escalates only when needed:
 
 1. `fetch`
 2. `jsdom`
-3. configured plugins
-4. `agent-browser`
+3. configured plugins (e.g. scrape.do)
+4. `agent-browser` (headless Chrome)
 
-Authenticated mode is explicit: `--with-credentials` jumps straight to `agent-browser` and fails fast if the configured browser profile is missing or unusable.
+Each response passes lightweight acceptance checks — word count, blocked-page detection — so bad results get caught and the next strategy gets tried automatically.
 
-Every successful result also passes lightweight acceptance checks so the CLI can reject obviously blocked, paywalled, or too-thin responses before escalating to the next strategy.
+Output varies by use case: full-page markdown (default), article extraction, raw HTML, structured section data, or a full-page screenshot. Pick with `--mode`.
+
+When a page requires login, `agent-fetch` uses a sandboxed browser profile you set up ahead of time — not your full browser session, just the credentials needed for fetching. If the profile is missing, it fails fast rather than silently falling back to unauthenticated requests.
 
 ## Install
 
@@ -122,7 +124,7 @@ agent-fetch setup --no-input --overwrite
 writing authenticated defaults. In `auto` or `simple` mode, it can write config
 without any browser profile settings.
 
-The setup walkthrough can now configure:
+The setup walkthrough configures:
 
 - default strategy mode
 - timeout and content validation thresholds
@@ -202,6 +204,8 @@ SCRAPEDO_TOKEN=your-token agent-fetch fetch https://example.com --json --debug-a
 ### Plugins
 
 ```bash
+agent-fetch plugins
+agent-fetch plugins --json
 agent-fetch plugins list
 agent-fetch plugins list --json
 ```

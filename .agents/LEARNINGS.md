@@ -45,3 +45,5 @@
 - The README should include end-to-end profile creation commands (`agent-browser install`, `agent-browser --profile ... open <login-url>`), not just `AGENT_FETCH_PROFILE`, because first-time users otherwise do not know how to create the profile that setup expects.
 - Screenshot output is now an agent-browser-only path result: treat `outputMode: 'screenshot'` as bypassing text acceptance checks, and keep `content` aligned with `screenshotPath`.
 - Exact `--method` / `FetchOptions.method` overrides should run only the named stage; normalize dotted plugin names like `scrape.do` to the plugin type `scrape-do`.
+- In this CLI, a parent Commander command with only subcommands still needs an explicit `.action(...)` if we want bare-command shorthand like `agent-fetch plugins`; otherwise it falls through to help instead of invoking the default behavior.
+- When this CLI adds or changes enum-like options, update Commander help strings and README examples in the same change; supported values can drift from `--help` surprisingly easily.
