@@ -25,6 +25,11 @@ bun add @andypai/agent-fetch
 
 `agent-fetch` is Bun-only. Use Bun for install, runtime, tests, and local tooling. Node.js and other package managers are not supported.
 
+## Docs
+
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Testing Guide](./docs/TESTING.md)
+
 ## CLI
 
 ### Fetch

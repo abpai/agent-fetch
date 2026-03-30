@@ -17,7 +17,7 @@ Verify:
 
 ```bash
 agent-fetch --help
-# Should print usage for fetch, setup, and plugins subcommands
+# Should print usage for fetch, setup/init, and plugins commands
 ```
 
 ---
@@ -39,7 +39,9 @@ agent-fetch
 agent-fetch -h
 agent-fetch fetch --help
 agent-fetch setup --help
+agent-fetch init --help
 agent-fetch plugins --help
+agent-fetch plugins list --help
 
 # Argument errors (exit code 2)
 agent-fetch fetch                                  # missing URL
@@ -131,11 +133,15 @@ AGENT_FETCH_MIN_WORD_COUNT=999999 agent-fetch fetch https://example.com --json -
 ## Step 5: Plugins — list & scrape-do execution
 
 ```bash
-# List plugins (text)
-agent-fetch plugins list
+# List plugins (text shorthand)
+agent-fetch plugins
 # Output: scrape-do, required: token, optional: endpoint, params, headers, timeout
 
-# List plugins (JSON)
+# List plugins (JSON shorthand)
+agent-fetch plugins --json
+
+# Explicit subcommand still works
+agent-fetch plugins list
 agent-fetch plugins list --json
 
 # Test scrape-do plugin execution with your token
@@ -474,7 +480,7 @@ Test plugin listing:
     "input": [
       {
         "type": "text",
-        "text": "Run `agent-fetch plugins list --json` and summarize the available plugins."
+        "text": "Run `agent-fetch plugins --json` and summarize the available plugins."
       }
     ]
   }

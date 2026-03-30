@@ -47,3 +47,4 @@
 - Exact `--method` / `FetchOptions.method` overrides should run only the named stage; normalize dotted plugin names like `scrape.do` to the plugin type `scrape-do`.
 - In this CLI, a parent Commander command with only subcommands still needs an explicit `.action(...)` if we want bare-command shorthand like `agent-fetch plugins`; otherwise it falls through to help instead of invoking the default behavior.
 - When this CLI adds or changes enum-like options, update Commander help strings and README examples in the same change; supported values can drift from `--help` surprisingly easily.
+- Keep longer contributor guides under `docs/` and link them from `README.md`; root-level docs should stay focused on the main package entrypoints and installation surface.

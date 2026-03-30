@@ -10,7 +10,7 @@ It prioritizes low-cost extraction first and escalates only when needed, while k
 
 - CLI binary: `agent-fetch`
 - Core command: `agent-fetch fetch <url>`
-- Supporting commands: `agent-fetch setup` (alias: `agent-fetch init`), `agent-fetch plugins list`
+- Supporting commands: `agent-fetch setup` (alias: `agent-fetch init`), `agent-fetch plugins` (shorthand for `agent-fetch plugins list`)
 - Library API: `fetchUrl()`, `FetchError`, `registerPlugin()`, `listBuiltinPlugins()`, `parseCliArgs()`, `runCli()`, plus public fetch/plugin types
 
 ## Strategy Modes
@@ -76,7 +76,7 @@ Legacy files are hard-rejected:
   - Bun entrypoint
   - exports CLI and library API
 - `src/cli/index.ts`
-  - command parsing (`fetch`, `setup`, `plugins list`)
+  - command parsing (`fetch`, `setup`/`init`, `plugins`/`plugins list`)
 - `src/cli/commands/fetch.ts`
   - runtime config + fetch engine execution
 - `src/cli/commands/setup.ts`
@@ -112,4 +112,4 @@ Legacy files are hard-rejected:
 - Built-ins + local register API only (`registerPlugin`)
 - No dynamic npm plugin auto-loading
 - Plugin config supports `${ENV_VAR}` interpolation
-- Built-in discovery surface today is `plugins list`, currently exposing `scrape-do`
+- Built-in discovery surface today is `plugins` / `plugins list`, currently exposing `scrape-do`
