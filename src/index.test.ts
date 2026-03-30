@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -19,6 +19,8 @@ const createMockAgentBrowser = (): string => {
   const dir = mkdtempSync(path.join(tmpdir(), 'agent-fetch-test-'))
   const scriptPath = path.join(dir, 'mock-agent-browser.mjs')
   const script = `#!/usr/bin/env node
+import { writeFileSync } from 'node:fs'
+
 const args = process.argv.slice(2)
 
 if (process.env.MOCK_AGENT_BROWSER_FAIL_OPEN === '1' && args.includes('open')) {
@@ -28,6 +30,13 @@ if (process.env.MOCK_AGENT_BROWSER_FAIL_OPEN === '1' && args.includes('open')) {
 
 if (args.includes('get') && args.includes('html')) {
   process.stdout.write(${JSON.stringify(AGENT_BROWSER_HTML)})
+  process.exit(0)
+}
+
+if (args.includes('screenshot')) {
+  const outputPath = args[args.length - 1]
+  writeFileSync(outputPath, 'fake-png-data')
+  process.stdout.write(JSON.stringify({ success: true, data: { path: outputPath }, error: null }))
   process.exit(0)
 }
 
@@ -180,5 +189,46 @@ describe('agent-fetch engine', () => {
     expect(
       result.structuredContent?.sections.some((section) => section.heading === 'News'),
     ).toBe(true)
+  })
+
+  it('returns screenshot output via agent-browser when requested', async () => {
+    const result = await fetchUrl(baseUrl, {
+      outputMode: 'screenshot',
+      enableFetch: true,
+      enableJsdom: true,
+      enablePlugins: true,
+      agentBrowser: {
+        command: mockAgentBrowserPath,
+      },
+    })
+
+    expect(result.outputMode).toBe('screenshot')
+    expect(result.strategy).toBe('agent-browser')
+    expect(result.screenshotPath).toBeTruthy()
+    expect(result.content).toBe(result.screenshotPath ?? '')
+    expect(result.markdown).toContain('# Authenticated Page')
+    expect(existsSync(result.screenshotPath as string)).toBe(true)
+    expect(result.attempts).toHaveLength(1)
+    expect(result.attempts[0]?.strategy).toBe('agent-browser')
+    expect(result.attempts[0]?.ok).toBe(true)
+  })
+
+  it('runs only the requested method when method override is set', async () => {
+    try {
+      await fetchUrl(baseUrl, {
+        method: 'fetch',
+        enableAgentBrowser: true,
+        enableJsdom: true,
+        enablePlugins: true,
+        plugins: [{ type: 'scrape-do', token: 'unused' }],
+        minWordCount: 1000,
+      })
+      throw new Error('Expected fetchUrl to throw')
+    } catch (error) {
+      expect(error).toBeInstanceOf(FetchError)
+      const fetchError = error as FetchError
+      expect(fetchError.attempts).toHaveLength(1)
+      expect(fetchError.attempts[0]?.strategy).toBe('fetch')
+    }
   })
 })

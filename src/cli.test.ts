@@ -31,6 +31,8 @@ describe('agent-fetch CLI parsing', () => {
       'fetch',
       'https://example.com',
       '--json',
+      '--method',
+      'scrape.do',
       '--profile',
       '/tmp/profile',
       '--no-jsdom',
@@ -47,6 +49,7 @@ describe('agent-fetch CLI parsing', () => {
       url: 'https://example.com',
       json: true,
       configPath: undefined,
+      method: 'scrape-do',
       profile: '/tmp/profile',
       outputMode: undefined,
       noJsdom: true,
@@ -74,6 +77,7 @@ describe('agent-fetch CLI parsing', () => {
       url: 'https://example.com',
       json: true,
       configPath: undefined,
+      method: undefined,
       profile: undefined,
       outputMode: 'html',
       noJsdom: false,
@@ -146,6 +150,40 @@ describe('agent-fetch CLI run', () => {
     expect(error).toEqual([
       '`authenticated` mode cannot be combined with `--no-agent-browser`.',
     ])
+  })
+
+  it('rejects screenshot mode when agent-browser is disabled', async () => {
+    const output: string[] = []
+    const error: string[] = []
+
+    const code = await runCli(
+      ['fetch', 'https://example.com', '--mode', 'screenshot', '--no-agent-browser'],
+      {
+        output: (message) => output.push(message),
+        error: (message) => error.push(message),
+      },
+    )
+
+    expect(code).toBe(2)
+    expect(output).toHaveLength(0)
+    expect(error).toEqual(['`screenshot` mode requires agent-browser to be enabled.'])
+  })
+
+  it('rejects non-browser methods in screenshot mode', async () => {
+    const output: string[] = []
+    const error: string[] = []
+
+    const code = await runCli(
+      ['fetch', 'https://example.com', '--mode', 'screenshot', '--method', 'fetch'],
+      {
+        output: (message) => output.push(message),
+        error: (message) => error.push(message),
+      },
+    )
+
+    expect(code).toBe(2)
+    expect(output).toHaveLength(0)
+    expect(error).toEqual(['`screenshot` mode only supports `--method agent-browser`.'])
   })
 
   it('applies fetch shorthand during CLI execution', async () => {

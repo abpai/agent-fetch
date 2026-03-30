@@ -6,7 +6,7 @@ import type { AgentFetchConfig, RuntimeConfig } from './types'
 import type { OutputMode } from '../core/types'
 
 const LEGACY_CONFIG_FILES = ['.fetchrc.json', 'fetch.config.json']
-const OUTPUT_MODES = ['markdown', 'primary', 'html', 'structured'] as const
+const OUTPUT_MODES = ['markdown', 'primary', 'html', 'structured', 'screenshot'] as const
 const STRATEGY_MODES = ['auto', 'simple', 'authenticated'] as const
 
 const DEFAULT_CONFIG_PATH = path.join(homedir(), '.config', 'agent-fetch', 'config.json')

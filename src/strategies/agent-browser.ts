@@ -1,3 +1,6 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { DEFAULT_TIMEOUT_MS } from '../core/http'
 import type { FetchEngineContext } from '../core/types'
 import { spawn } from 'node:child_process'
@@ -6,6 +9,12 @@ interface CommandResult {
   code: number
   stdout: string
   stderr: string
+}
+
+interface BrowserWorkflow {
+  command: string
+  profile: string | undefined
+  timeoutMs: number
 }
 
 const runCommand = async (
@@ -71,10 +80,7 @@ const resolveProfile = (context: FetchEngineContext): string | undefined =>
   context.environment.AGENT_FETCH_PROFILE ||
   process.env.AGENT_FETCH_PROFILE
 
-const buildCommandArgs = (
-  profile: string | undefined,
-  args: string[],
-): string[] => {
+const buildCommandArgs = (profile: string | undefined, args: string[]): string[] => {
   if (!profile) {
     return args
   }
@@ -82,32 +88,32 @@ const buildCommandArgs = (
   return ['--profile', profile, ...args]
 }
 
-const runWorkflow = async (
-  command: string,
-  profile: string | undefined,
+const openPage = async (
+  workflow: BrowserWorkflow,
   url: string,
-  timeoutMs: number,
   waitForNetworkIdle: boolean,
-): Promise<string> => {
+): Promise<void> => {
   await runCheckedCommand(
-    command,
-    buildCommandArgs(profile, ['open', url]),
-    timeoutMs,
+    workflow.command,
+    buildCommandArgs(workflow.profile, ['open', url]),
+    workflow.timeoutMs,
     'agent-browser open',
   )
 
   const loadState = waitForNetworkIdle ? 'networkidle' : 'load'
   await runCheckedCommand(
-    command,
-    buildCommandArgs(profile, ['wait', '--load', loadState]),
-    timeoutMs,
+    workflow.command,
+    buildCommandArgs(workflow.profile, ['wait', '--load', loadState]),
+    workflow.timeoutMs,
     'agent-browser wait',
   )
+}
 
+const getHtml = async (workflow: BrowserWorkflow): Promise<string> => {
   const htmlResult = await runCheckedCommand(
-    command,
-    buildCommandArgs(profile, ['get', 'html', 'body']),
-    timeoutMs,
+    workflow.command,
+    buildCommandArgs(workflow.profile, ['get', 'html', 'body']),
+    workflow.timeoutMs,
     'agent-browser get html',
   )
 
@@ -119,11 +125,46 @@ const runWorkflow = async (
   return html
 }
 
-export const runAgentBrowserStrategy = async (
-  url: string,
+const tryGetHtml = async (workflow: BrowserWorkflow): Promise<string> => {
+  try {
+    return await getHtml(workflow)
+  } catch {
+    return ''
+  }
+}
+
+const takeScreenshot = async (workflow: BrowserWorkflow): Promise<string> => {
+  const screenshotDir = await mkdtemp(path.join(tmpdir(), 'agent-fetch-shot-'))
+  const screenshotPath = path.join(screenshotDir, 'page.png')
+  const result = await runCheckedCommand(
+    workflow.command,
+    buildCommandArgs(workflow.profile, [
+      'screenshot',
+      '--full',
+      '--json',
+      screenshotPath,
+    ]),
+    workflow.timeoutMs,
+    'agent-browser screenshot',
+  )
+
+  const payload = JSON.parse(result.stdout) as {
+    success?: boolean
+    data?: { path?: string }
+    error?: string | null
+  }
+  const resolvedPath = payload.data?.path?.trim()
+  if (!payload.success || !resolvedPath) {
+    throw new Error(payload.error || 'agent-browser screenshot returned no path')
+  }
+
+  return resolvedPath
+}
+
+const resolveWorkflow = (
   context: FetchEngineContext,
   requireCredentials: boolean,
-): Promise<string> => {
+): BrowserWorkflow => {
   const command = context.options.agentBrowser?.command || 'agent-browser'
   const timeoutMs = context.options.timeout ?? DEFAULT_TIMEOUT_MS
   const profile = resolveProfile(context)?.trim() || undefined
@@ -134,6 +175,31 @@ export const runAgentBrowserStrategy = async (
     )
   }
 
+  return { command, timeoutMs, profile }
+}
+
+export const runAgentBrowserStrategy = async (
+  url: string,
+  context: FetchEngineContext,
+  requireCredentials: boolean,
+): Promise<string> => {
+  const workflow = resolveWorkflow(context, requireCredentials)
   const waitForNetworkIdle = context.options.waitForNetworkIdle ?? true
-  return runWorkflow(command, profile, url, timeoutMs, waitForNetworkIdle)
+  await openPage(workflow, url, waitForNetworkIdle)
+  return getHtml(workflow)
+}
+
+export const runAgentBrowserScreenshot = async (
+  url: string,
+  context: FetchEngineContext,
+  requireCredentials: boolean,
+): Promise<{ screenshotPath: string; html: string }> => {
+  const workflow = resolveWorkflow(context, requireCredentials)
+  const waitForNetworkIdle = context.options.waitForNetworkIdle ?? true
+
+  await openPage(workflow, url, waitForNetworkIdle)
+  const screenshotPath = await takeScreenshot(workflow)
+  const html = await tryGetHtml(workflow)
+
+  return { screenshotPath, html }
 }

@@ -8,6 +8,7 @@ export { FetchError } from './core/types'
 export type {
   AgentBrowserOptions,
   FetchAttempt,
+  FetchMethod,
   FetchOptions,
   FetchResult,
   FetchStrategy,

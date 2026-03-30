@@ -412,6 +412,7 @@ export const extractFromHtml = async (
       author: primary.author,
       content,
       outputMode,
+      screenshotPath: null,
       markdown,
       primaryMarkdown: primary.markdown,
       html,
@@ -439,6 +440,7 @@ export const extractFromHtml = async (
             ? JSON.stringify(fallbackStructuredContent, null, 2)
             : fallbackMarkdown,
       outputMode,
+      screenshotPath: null,
       markdown: fallbackMarkdown,
       primaryMarkdown: fallbackMarkdown,
       html,

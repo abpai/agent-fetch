@@ -173,7 +173,8 @@ const parseOutputMode = (value: string | undefined): OutputMode | undefined => {
     normalized === 'markdown' ||
     normalized === 'primary' ||
     normalized === 'html' ||
-    normalized === 'structured'
+    normalized === 'structured' ||
+    normalized === 'screenshot'
   ) {
     return normalized
   }

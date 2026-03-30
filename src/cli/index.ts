@@ -164,6 +164,11 @@ function registerFetchCommand(
     .argument('<url>', 'URL to fetch')
     .option('--json', 'Output structured JSON result')
     .option('--config <path>', 'Path to config JSON file')
+    .option(
+      '--method <method>',
+      'Exact method: fetch, jsdom, agent-browser, scrape.do',
+      parseMethod,
+    )
     .option('--profile <path>', 'Persistent agent-browser profile path')
     .option('--no-jsdom', 'Disable jsdom fallback strategy')
     .option('--no-plugins', 'Disable plugin fallback strategies')
@@ -191,6 +196,7 @@ function registerFetchCommand(
         options: {
           json?: boolean
           config?: string
+          method?: string
           profile?: string
           mode?: OutputMode
           jsdom?: boolean
@@ -207,6 +213,7 @@ function registerFetchCommand(
           url,
           json: options.json === true,
           configPath: options.config,
+          method: options.method,
           profile: options.profile,
           outputMode: options.mode,
           noJsdom: options.jsdom === false,
@@ -302,14 +309,24 @@ function parseOutputMode(raw: string): OutputMode {
     normalized === 'markdown' ||
     normalized === 'primary' ||
     normalized === 'html' ||
-    normalized === 'structured'
+    normalized === 'structured' ||
+    normalized === 'screenshot'
   ) {
     return normalized
   }
 
   throw new InvalidArgumentError(
-    "Expected one of: 'markdown', 'primary', 'html', 'structured'.",
+    "Expected one of: 'markdown', 'primary', 'html', 'structured', 'screenshot'.",
   )
+}
+
+function parseMethod(raw: string): string {
+  const normalized = raw.trim().toLowerCase().replaceAll('.', '-')
+  if (!normalized) {
+    throw new InvalidArgumentError('Expected a non-empty method name.')
+  }
+
+  return normalized
 }
 
 function normalizeCommanderError(message: string): string {

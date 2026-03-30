@@ -1,5 +1,6 @@
 export type FetchStrategy = 'fetch' | 'jsdom' | 'agent-browser' | (string & {})
-export type OutputMode = 'markdown' | 'primary' | 'html' | 'structured'
+export type FetchMethod = 'fetch' | 'jsdom' | 'agent-browser' | (string & {})
+export type OutputMode = 'markdown' | 'primary' | 'html' | 'structured' | 'screenshot'
 
 export interface StructuredHeading {
   level: number
@@ -31,6 +32,7 @@ export interface FetchResult {
   author: string | null
   content: string
   outputMode: OutputMode
+  screenshotPath: string | null
   markdown: string
   primaryMarkdown: string
   html: string
@@ -52,6 +54,7 @@ export interface FetchAttempt {
 export type StrategyMode = 'auto' | 'simple' | 'authenticated'
 
 export interface FetchOptions {
+  method?: FetchMethod
   outputMode?: OutputMode
   timeout?: number
   waitForNetworkIdle?: boolean
