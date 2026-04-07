@@ -1,5 +1,6 @@
 import { loadRuntimeConfig } from '../../config/loader'
 import { fetchUrl } from '../../core/fetch-engine'
+import { serializeFetchResult } from '../../core/serialize'
 import { FetchError } from '../../core/types'
 import type { OutputMode, StrategyMode } from '../../core/types'
 import type { FetchCommand } from '../types'
@@ -123,28 +124,7 @@ export const runFetchCommand = async (
     const result = await fetchUrl(command.url, options)
 
     if (command.json) {
-      dependencies.output(
-        JSON.stringify(
-          {
-            url: result.url,
-            title: result.title,
-            author: result.author,
-            content: result.content,
-            outputMode: result.outputMode,
-            screenshotPath: result.screenshotPath,
-            markdown: result.markdown,
-            primaryMarkdown: result.primaryMarkdown,
-            html: result.html,
-            structuredContent: result.structuredContent,
-            wordCount: result.wordCount,
-            strategy: result.strategy,
-            fetchedAt: result.fetchedAt.toISOString(),
-            attempts: result.attempts,
-          },
-          null,
-          2,
-        ),
-      )
+      dependencies.output(JSON.stringify(serializeFetchResult(result), null, 2))
     } else {
       dependencies.output(result.content)
     }

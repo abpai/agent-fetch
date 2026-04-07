@@ -1,8 +1,8 @@
 # agent-fetch
 
-A fetch CLI for AI agents.
+Reliable web access for AI agents.
 
-Fetching web pages programmatically has gotten messy. Cloudflare bot detection, server-side rendering, SPAs that return empty `<div>`s, paywalls — half the web blocks a plain `fetch` even when you aren't doing anything adversarial. You can throw a headless browser at every request, or route through a third-party scraping API, but that's wasteful when `curl` would've worked for most of your list.
+Your agents need to read web pages, but half the web fights back. Cloudflare challenges, SPAs that return empty `<div>`s, paywalls for content you already pay for. You can throw a headless browser at every request or route through a scraping API, but that's wasteful when a plain `fetch` would've worked for most URLs.
 
 `agent-fetch` tries the cheapest method first and escalates only when needed:
 
@@ -11,11 +11,11 @@ Fetching web pages programmatically has gotten messy. Cloudflare bot detection, 
 3. configured plugins (e.g. scrape.do)
 4. `agent-browser` (headless Chrome)
 
-Each response passes lightweight acceptance checks — word count, blocked-page detection — so bad results get caught and the next strategy gets tried automatically.
+Each response passes lightweight checks — word count, blocked-page detection, paywall patterns — so bad results get caught and the next strategy fires automatically.
 
-Output varies by use case: full-page markdown (default), article extraction, raw HTML, structured section data, or a full-page screenshot. Pick with `--mode`.
+It runs on your machine, with your IP and your browser sessions. Sites see a residential visitor, not a datacenter. When you've logged into Stratechery or your company wiki, `agent-fetch` uses those sessions so your agents aren't locked out.
 
-When a page requires login, `agent-fetch` uses a sandboxed browser profile you set up ahead of time — not your full browser session, just the credentials needed for fetching. If the profile is missing, it fails fast rather than silently falling back to unauthenticated requests.
+Run it as a CLI, use it as a library, or start the HTTP server and let any agent POST a URL to get markdown back.
 
 ## Install
 
@@ -24,6 +24,40 @@ bun add @andypai/agent-fetch
 ```
 
 `agent-fetch` is Bun-only. Use Bun for install, runtime, tests, and local tooling. Node.js and other package managers are not supported.
+
+## Giving your agents web access
+
+The quickest path: bind `agent-fetch` on your dev machine, then put it behind [Tailscale](https://tailscale.com) so agents on your tailnet can reach it without exposing anything to the public internet.
+
+```bash
+agent-fetch server --host 0.0.0.0
+```
+
+Any agent can POST a URL and get clean markdown:
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com"}' \
+  http://your-machine:7411/fetch
+```
+
+This is how tools like [openclaw](https://github.com/openclaw/openclaw) get web content — POST a link, get text back, no browser management on the agent side.
+
+### Accessing content you pay for
+
+Set up a browser profile, log into your subscriptions once, and `agent-fetch` reuses those sessions for every request:
+
+```bash
+# Create a profile and log in interactively
+agent-browser --profile ~/.agent-browser/profiles/work --headed open https://stratechery.com/
+
+# Now agents can fetch paywalled content through the server
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"url":"https://stratechery.com/","options":{"strategyMode":"authenticated"}}' \
+  http://localhost:7411/fetch
+```
+
+The profile stores cookies and auth state — not your full browser history, just what's needed for fetching. If the profile isn't configured, `agent-fetch` fails fast rather than silently returning a login page.
 
 ## Docs
 

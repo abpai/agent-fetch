@@ -27,6 +27,18 @@ describe('GET /health', () => {
   })
 })
 
+describe('GET /', () => {
+  it('returns the built-in fetch UI', async () => {
+    const res = await handleRequest(makeRequest('GET', '/'), emptyConfig, emptyEnv)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('text/html')
+    const html = await res.text()
+    expect(html).toContain('<title>agent-fetch</title>')
+    expect(html).toContain('id="url"')
+    expect(html).toContain("fetch('/fetch'")
+  })
+})
+
 describe('POST /fetch', () => {
   it('returns markdown by default', async () => {
     const res = await handleRequest(
