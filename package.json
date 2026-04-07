@@ -22,6 +22,14 @@
     "bun": ">=1.1.0"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abpai/agent-fetch.git"
+  },
+  "homepage": "https://abpai.github.io/agent-fetch",
+  "bugs": {
+    "url": "https://github.com/abpai/agent-fetch/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
