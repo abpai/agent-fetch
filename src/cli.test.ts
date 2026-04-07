@@ -167,7 +167,9 @@ describe('agent-fetch CLI run', () => {
     })
 
     expect(code).toBe(0)
-    expect(output.join('\n')).toContain('Output mode: markdown, primary, html, structured')
+    expect(output.join('\n')).toContain(
+      'Output mode: markdown, primary, html, structured',
+    )
     expect(output.join('\n')).toContain('screenshot')
     expect(error).toHaveLength(0)
   })

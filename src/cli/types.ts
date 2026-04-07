@@ -30,8 +30,20 @@ export interface PluginsListCommand {
   json: boolean
 }
 
+export interface ServerCommand {
+  command: 'server'
+  port: number
+  host: string
+  configPath?: string
+}
+
 export interface HelpCommand {
   command: 'help'
 }
 
-export type ParsedCommand = FetchCommand | SetupCommand | PluginsListCommand | HelpCommand
+export type ParsedCommand =
+  | FetchCommand
+  | SetupCommand
+  | PluginsListCommand
+  | ServerCommand
+  | HelpCommand

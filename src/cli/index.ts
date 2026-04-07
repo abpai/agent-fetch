@@ -1,12 +1,14 @@
 import { Command, CommanderError, InvalidArgumentError } from 'commander'
 import { runFetchCommand } from './commands/fetch'
 import { runPluginsListCommand } from './commands/plugins'
+import { runServerCommand } from './commands/server'
 import { runSetupCommand } from './commands/setup'
 import type { OutputMode } from '../core/types'
 import type {
   FetchCommand,
   ParsedCommand,
   PluginsListCommand,
+  ServerCommand,
   SetupCommand,
 } from './types'
 
@@ -40,6 +42,8 @@ export async function runCli(
         return 0
       case 'plugins-list':
         return runPluginsListCommand(parsed.command, { output })
+      case 'server':
+        return await runServerCommand(parsed.command, { error })
       default:
         error('Unknown command.')
         return 2
@@ -171,6 +175,7 @@ function buildProgram(
   registerFetchCommand(program, onParse)
   registerSetupCommand(program, onParse)
   registerPluginsCommand(program, onParse)
+  registerServerCommand(program, onParse)
 
   return program
 }
@@ -299,6 +304,26 @@ function registerPluginsCommand(
         command: 'plugins-list',
         json: options.json === true,
       } satisfies PluginsListCommand)
+    })
+}
+
+function registerServerCommand(
+  program: Command,
+  onParse: (command: ParsedCommand) => void,
+): void {
+  program
+    .command('server')
+    .description('Start an HTTP server exposing fetch capabilities')
+    .option('--port <port>', 'Port to listen on', positiveInt, 7411)
+    .option('--host <host>', 'Host to bind to', '127.0.0.1')
+    .option('--config <path>', 'Path to config JSON file')
+    .action((options: { port: number; host: string; config?: string }) => {
+      onParse({
+        command: 'server',
+        port: options.port,
+        host: options.host,
+        configPath: options.config,
+      } satisfies ServerCommand)
     })
 }
 
