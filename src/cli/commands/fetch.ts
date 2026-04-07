@@ -117,6 +117,7 @@ export const runFetchCommand = async (
       environment: runtime.environment,
       agentBrowser: {
         ...runtime.config.agentBrowser,
+        ...(command.headed ? { headed: true } : {}),
         ...(command.profile ? { profile: command.profile } : {}),
       },
     }

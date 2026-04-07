@@ -7,6 +7,7 @@ export interface FetchCommand {
   configPath?: string
   method?: string
   profile?: string
+  headed: boolean
   outputMode?: OutputMode
   noJsdom: boolean
   noPlugins: boolean

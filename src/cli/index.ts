@@ -196,6 +196,7 @@ function registerFetchCommand(
       parseMethod,
     )
     .option('--profile <path>', 'Persistent agent-browser profile path')
+    .option('--headed', 'Launch agent-browser in headed mode for debugging')
     .option('--no-jsdom', 'Disable jsdom fallback strategy')
     .option('--no-plugins', 'Disable plugin fallback strategies')
     .option('--no-agent-browser', 'Disable agent-browser fallback strategy')
@@ -224,6 +225,7 @@ function registerFetchCommand(
           config?: string
           method?: string
           profile?: string
+          headed?: boolean
           mode?: OutputMode
           jsdom?: boolean
           plugins?: boolean
@@ -241,6 +243,7 @@ function registerFetchCommand(
           configPath: options.config,
           method: options.method,
           profile: options.profile,
+          headed: options.headed === true,
           outputMode: options.mode,
           noJsdom: options.jsdom === false,
           noPlugins: options.plugins === false,

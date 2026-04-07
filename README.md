@@ -94,6 +94,9 @@ agent-fetch fetch https://example.com --config /tmp/agent-fetch.json
 # Use a persistent browser profile for a one-off authenticated request
 agent-fetch fetch https://example.com --with-credentials --profile ~/.agent-browser/profiles/work
 
+# Launch agent-browser in headed mode for debugging
+agent-fetch fetch https://example.com --method agent-browser --headed
+
 # Disable fallback stages
 agent-fetch fetch https://example.com --no-jsdom --no-plugins
 

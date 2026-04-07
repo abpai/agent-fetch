@@ -88,6 +88,7 @@ export interface FetchEngineContext {
 export interface AgentBrowserOptions {
   profile?: string
   command?: string
+  headed?: boolean
 }
 
 export class FetchError extends Error {

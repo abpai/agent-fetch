@@ -14,8 +14,11 @@ interface CommandResult {
 interface BrowserWorkflow {
   command: string
   profile: string | undefined
+  headed: boolean
   timeoutMs: number
 }
+
+const PROFILE_IGNORED_PATTERN = /--profile ignored: daemon already running/i
 
 const runCommand = async (
   command: string,
@@ -61,16 +64,35 @@ const commandFailed = (action: string, result: CommandResult): never => {
   throw new Error(`${action} failed: ${detail}`)
 }
 
+const ensureProfileApplied = (
+  action: string,
+  result: CommandResult,
+  profile: string | undefined,
+): void => {
+  if (!profile) {
+    return
+  }
+
+  if (PROFILE_IGNORED_PATTERN.test(result.stderr)) {
+    throw new Error(
+      `${action} failed: agent-browser ignored the requested profile because a browser daemon is already running with different options. Run \`agent-browser close\` and retry.`,
+    )
+  }
+}
+
 const runCheckedCommand = async (
   command: string,
   args: string[],
   timeoutMs: number,
   action: string,
+  profile?: string,
 ): Promise<CommandResult> => {
   const result = await runCommand(command, args, timeoutMs)
   if (result.code !== 0) {
     commandFailed(action, result)
   }
+
+  ensureProfileApplied(action, result, profile)
 
   return result
 }
@@ -80,40 +102,59 @@ const resolveProfile = (context: FetchEngineContext): string | undefined =>
   context.environment.AGENT_FETCH_PROFILE ||
   process.env.AGENT_FETCH_PROFILE
 
-const buildCommandArgs = (profile: string | undefined, args: string[]): string[] => {
-  if (!profile) {
-    return args
+const buildCommandArgs = (
+  workflow: BrowserWorkflow,
+  args: string[],
+  includeHeaded = false,
+): string[] => {
+  const commandArgs: string[] = []
+
+  if (workflow.profile) {
+    commandArgs.push('--profile', workflow.profile)
   }
 
-  return ['--profile', profile, ...args]
+  if (includeHeaded && workflow.headed) {
+    commandArgs.push('--headed')
+  }
+
+  commandArgs.push(...args)
+
+  return commandArgs
 }
+
+const runWorkflowCommand = (
+  workflow: BrowserWorkflow,
+  args: string[],
+  action: string,
+  includeHeaded = false,
+): Promise<CommandResult> =>
+  runCheckedCommand(
+    workflow.command,
+    buildCommandArgs(workflow, args, includeHeaded),
+    workflow.timeoutMs,
+    action,
+    workflow.profile,
+  )
 
 const openPage = async (
   workflow: BrowserWorkflow,
   url: string,
   waitForNetworkIdle: boolean,
 ): Promise<void> => {
-  await runCheckedCommand(
-    workflow.command,
-    buildCommandArgs(workflow.profile, ['open', url]),
-    workflow.timeoutMs,
-    'agent-browser open',
-  )
+  await runWorkflowCommand(workflow, ['open', url], 'agent-browser open', true)
 
   const loadState = waitForNetworkIdle ? 'networkidle' : 'load'
-  await runCheckedCommand(
-    workflow.command,
-    buildCommandArgs(workflow.profile, ['wait', '--load', loadState]),
-    workflow.timeoutMs,
+  await runWorkflowCommand(
+    workflow,
+    ['wait', '--load', loadState],
     'agent-browser wait',
   )
 }
 
 const getHtml = async (workflow: BrowserWorkflow): Promise<string> => {
-  const htmlResult = await runCheckedCommand(
-    workflow.command,
-    buildCommandArgs(workflow.profile, ['get', 'html', 'body']),
-    workflow.timeoutMs,
+  const htmlResult = await runWorkflowCommand(
+    workflow,
+    ['get', 'html', 'body'],
     'agent-browser get html',
   )
 
@@ -136,15 +177,14 @@ const tryGetHtml = async (workflow: BrowserWorkflow): Promise<string> => {
 const takeScreenshot = async (workflow: BrowserWorkflow): Promise<string> => {
   const screenshotDir = await mkdtemp(path.join(tmpdir(), 'agent-fetch-shot-'))
   const screenshotPath = path.join(screenshotDir, 'page.png')
-  const result = await runCheckedCommand(
-    workflow.command,
-    buildCommandArgs(workflow.profile, [
+  const result = await runWorkflowCommand(
+    workflow,
+    [
       'screenshot',
       '--full',
       '--json',
       screenshotPath,
-    ]),
-    workflow.timeoutMs,
+    ],
     'agent-browser screenshot',
   )
 
@@ -168,6 +208,7 @@ const resolveWorkflow = (
   const command = context.options.agentBrowser?.command || 'agent-browser'
   const timeoutMs = context.options.timeout ?? DEFAULT_TIMEOUT_MS
   const profile = resolveProfile(context)?.trim() || undefined
+  const headed = context.options.agentBrowser?.headed === true
 
   if (requireCredentials && !profile) {
     throw new Error(
@@ -175,7 +216,7 @@ const resolveWorkflow = (
     )
   }
 
-  return { command, timeoutMs, profile }
+  return { command, timeoutMs, profile, headed }
 }
 
 export const runAgentBrowserStrategy = async (

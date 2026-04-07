@@ -28,6 +28,20 @@ if (process.env.MOCK_AGENT_BROWSER_FAIL_OPEN === '1' && args.includes('open')) {
   process.exit(1)
 }
 
+if (process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_IGNORED === '1' && args.includes('--profile')) {
+  console.error("⚠ --profile ignored: daemon already running. Use 'agent-browser close' first to restart with new options.")
+}
+
+if (process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED === '1' && args.includes('open') && !args.includes('--headed')) {
+  console.error('expected --headed flag on open')
+  process.exit(1)
+}
+
+if (process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED === '1' && !args.includes('open') && args.includes('--headed')) {
+  console.error('unexpected --headed flag outside open')
+  process.exit(1)
+}
+
 if (args.includes('get') && args.includes('html')) {
   process.stdout.write(${JSON.stringify(AGENT_BROWSER_HTML)})
   process.exit(0)
@@ -167,6 +181,57 @@ describe('agent-fetch engine', () => {
       expect(browserAttempt?.ok).toBe(false)
     } finally {
       delete process.env.MOCK_AGENT_BROWSER_FAIL_OPEN
+    }
+  })
+
+  it('fails with an actionable error when agent-browser ignores the requested profile', async () => {
+    process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_IGNORED = '1'
+
+    try {
+      await fetchUrl(baseUrl, {
+        withCredentials: true,
+        agentBrowser: {
+          profile: '/tmp/test-profile',
+          command: mockAgentBrowserPath,
+        },
+      })
+      throw new Error('Expected fetchUrl to throw')
+    } catch (error) {
+      expect(error).toBeInstanceOf(FetchError)
+      const fetchError = error as FetchError
+      expect(fetchError.message).toContain('Authenticated fetch failed')
+      expect(fetchError.attempts).toHaveLength(1)
+      expect(fetchError.attempts[0]?.strategy).toBe('agent-browser')
+      expect(fetchError.attempts[0]?.ok).toBe(false)
+      expect(fetchError.attempts[0]?.error).toContain(
+        'agent-browser ignored the requested profile',
+      )
+    } finally {
+      delete process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_IGNORED
+    }
+  })
+
+  it('passes headed through to agent-browser when requested', async () => {
+    process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED = '1'
+
+    try {
+      const result = await fetchUrl(baseUrl, {
+        method: 'agent-browser',
+        agentBrowser: {
+          command: mockAgentBrowserPath,
+          headed: true,
+        },
+        minHtmlLength: 20,
+        minWordCount: 3,
+        minMarkdownLength: 20,
+      })
+
+      expect(result.strategy).toBe('agent-browser')
+      expect(result.content).toContain('# Authenticated Page')
+      expect(result.attempts).toHaveLength(1)
+      expect(result.attempts[0]?.ok).toBe(true)
+    } finally {
+      delete process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED
     }
   })
 
