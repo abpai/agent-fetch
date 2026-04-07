@@ -51,3 +51,4 @@
 
 ## 2026-04-07
 - When README examples describe remote access to `agent-fetch server`, include the required bind host explicitly (`--host 0.0.0.0`); the default server host is localhost-only and makes tailnet examples misleading.
+- For `agent-browser` debugging flags in this repo, thread `--headed` only into the `open` launch command; reusing it on follow-up commands like `wait` or `get` is unnecessary and can make the CLI integration more brittle.
