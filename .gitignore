@@ -17,3 +17,5 @@ dist/
 .idea
 .vscode
 *.sw?
+scripts/profiles
+.agents/pi
