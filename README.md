@@ -206,6 +206,55 @@ You can also wire it manually:
 SCRAPEDO_TOKEN=your-token agent-fetch fetch https://example.com --json --debug-attempts
 ```
 
+### Server
+
+Start a local HTTP server that exposes fetch capabilities over HTTP.
+
+```bash
+# Start with defaults (127.0.0.1:7411)
+agent-fetch server
+
+# Custom port and host
+agent-fetch server --port 8080 --host 0.0.0.0
+
+# With a config file for default fetch options
+agent-fetch server --config ~/.config/agent-fetch/config.json
+```
+
+POST a URL to fetch it:
+
+```bash
+# Returns markdown by default
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com"}' \
+  http://localhost:7411/fetch
+
+# With options
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com","options":{"outputMode":"primary","strategy":"simple"}}' \
+  http://localhost:7411/fetch
+
+# JSON response with full FetchResult
+curl -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' \
+  -d '{"url":"https://example.com"}' \
+  http://localhost:7411/fetch
+
+# Health check
+curl http://localhost:7411/health
+```
+
+The request body requires a `url` field. The `options` field is optional and accepts the same fields as `FetchOptions` (outputMode, method, timeout, strategy, etc.). When a `--config` file is provided, its defaults are merged with per-request options, with request options taking precedence.
+
+Default response is `text/markdown`. Send `Accept: application/json` to get the full `FetchResult` JSON envelope.
+
+Constraints:
+
+- Binds to `127.0.0.1` by default (localhost-only).
+- Request body limited to 1MB.
+- HTTP-level timeout of 120s (independent of fetch strategy timeouts).
+- CORS headers (`Access-Control-Allow-Origin: *`) included on all responses.
+- `screenshotPath` in responses is a local filesystem path, only meaningful on the server host.
+
 ### Plugins
 
 ```bash
