@@ -115,10 +115,7 @@ const resolveProfile = (context: FetchEngineContext): string | undefined => {
   return raw ? expandTilde(raw) : undefined
 }
 
-const buildCommandArgs = (
-  workflow: BrowserWorkflow,
-  args: string[],
-): string[] => {
+const buildCommandArgs = (workflow: BrowserWorkflow, args: string[]): string[] => {
   const commandArgs: string[] = []
 
   if (workflow.profile) {
@@ -150,7 +147,8 @@ const runWorkflowCommand = (
   )
 
 const isProfileIgnoredError = (error: unknown): boolean =>
-  error instanceof Error && error.message.includes('agent-browser ignored the requested profile')
+  error instanceof Error &&
+  error.message.includes('agent-browser ignored the requested profile')
 
 const closeBrowser = async (workflow: BrowserWorkflow): Promise<void> => {
   await runCommand(workflow.command, ['close'], workflow.timeoutMs)
@@ -172,11 +170,7 @@ const openPage = async (
   }
 
   const loadState = waitForNetworkIdle ? 'networkidle' : 'load'
-  await runWorkflowCommand(
-    workflow,
-    ['wait', '--load', loadState],
-    'agent-browser wait',
-  )
+  await runWorkflowCommand(workflow, ['wait', '--load', loadState], 'agent-browser wait')
 }
 
 const getHtml = async (workflow: BrowserWorkflow): Promise<string> => {
@@ -207,12 +201,7 @@ const takeScreenshot = async (workflow: BrowserWorkflow): Promise<string> => {
   const screenshotPath = path.join(screenshotDir, 'page.png')
   const result = await runWorkflowCommand(
     workflow,
-    [
-      'screenshot',
-      '--full',
-      '--json',
-      screenshotPath,
-    ],
+    ['screenshot', '--full', '--json', screenshotPath],
     'agent-browser screenshot',
   )
 
