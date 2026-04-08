@@ -13,6 +13,7 @@ const DEFAULT_BLOCKED_PATTERNS: RegExp[] = [
   /cloudflare/i,
   /robot check/i,
   /verify you are/i,
+  /something went wrong/i,
 ]
 
 const PAYWALL_TEXT_SIGNALS: RegExp[] = [

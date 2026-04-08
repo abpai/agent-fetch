@@ -7,20 +7,20 @@ export interface FetchCommand {
   configPath?: string
   method?: string
   profile?: string
+  headed: boolean
   outputMode?: OutputMode
   noJsdom: boolean
   noPlugins: boolean
   noAgentBrowser: boolean
   timeout?: number
   withCredentials: boolean
-  strategy: 'auto' | 'simple' | 'authenticated'
+  strategy?: 'auto' | 'simple' | 'authenticated'
   debugAttempts: boolean
 }
 
 export interface SetupCommand {
   command: 'setup'
   configPath?: string
-  envFilePath?: string
   noInput: boolean
   overwrite: boolean
 }

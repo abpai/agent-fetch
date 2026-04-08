@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { readEnvFile } from './env-file'
 import type { AgentFetchConfig, RuntimeConfig } from './types'
 import type { OutputMode } from '../core/types'
 
@@ -9,8 +8,7 @@ const LEGACY_CONFIG_FILES = ['.fetchrc.json', 'fetch.config.json']
 const OUTPUT_MODES = ['markdown', 'primary', 'html', 'structured', 'screenshot'] as const
 const STRATEGY_MODES = ['auto', 'simple', 'authenticated'] as const
 
-const DEFAULT_CONFIG_PATH = path.join(homedir(), '.config', 'agent-fetch', 'config.json')
-const DEFAULT_ENV_PATH = path.join(homedir(), '.agent-fetch', '.env')
+const DEFAULT_CONFIG_PATH = path.join(homedir(), '.agent-fetch', 'config.json')
 
 const toBoolean = (value: string | undefined): boolean | undefined => {
   if (value === undefined) {
@@ -47,6 +45,17 @@ const toOutputMode = (value: string | undefined): OutputMode | undefined => {
 const buildEnvOverrides = (environment: Record<string, string>): AgentFetchConfig => {
   const strategyMode = environment.AGENT_FETCH_STRATEGY_MODE
   const normalizedMode = STRATEGY_MODES.find((mode) => mode === strategyMode)
+  const agentBrowser =
+    environment.AGENT_FETCH_PROFILE || environment.AGENT_FETCH_AGENT_BROWSER_COMMAND
+      ? {
+          ...(environment.AGENT_FETCH_PROFILE
+            ? { profile: environment.AGENT_FETCH_PROFILE }
+            : {}),
+          ...(environment.AGENT_FETCH_AGENT_BROWSER_COMMAND
+            ? { command: environment.AGENT_FETCH_AGENT_BROWSER_COMMAND }
+            : {}),
+        }
+      : undefined
 
   return {
     outputMode: toOutputMode(environment.AGENT_FETCH_OUTPUT_MODE),
@@ -64,10 +73,7 @@ const buildEnvOverrides = (environment: Record<string, string>): AgentFetchConfi
     blockedWordCountThreshold: toNumber(
       environment.AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD,
     ),
-    agentBrowser: {
-      profile: environment.AGENT_FETCH_PROFILE,
-      command: environment.AGENT_FETCH_AGENT_BROWSER_COMMAND,
-    },
+    agentBrowser,
   }
 }
 
@@ -123,7 +129,7 @@ const findLegacyConfigPath = (): string | null => {
 
 const throwLegacyConfigError = (legacyPath: string): never => {
   throw new Error(
-    `Legacy config file detected at ${legacyPath}. This project now requires agent-fetch config only. Move settings to ~/.config/agent-fetch/config.json and remove legacy files.`,
+    `Legacy config file detected at ${legacyPath}. This project now requires agent-fetch config only. Move settings to ~/.agent-fetch/config.json and remove legacy files.`,
   )
 }
 
@@ -142,11 +148,33 @@ const readJsonConfig = (filePath: string): AgentFetchConfig => {
 
 interface LoadRuntimeConfigOptions {
   configPath?: string
-  envFilePath?: string
 }
 
 export const getDefaultConfigPath = (): string => DEFAULT_CONFIG_PATH
-export const getDefaultEnvPath = (): string => DEFAULT_ENV_PATH
+
+const getProcessEnvironment = (): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  )
+
+const buildRuntimeEnvironment = (
+  config: AgentFetchConfig,
+  processEnvironment: Record<string, string>,
+): Record<string, string> => {
+  const environment = { ...processEnvironment }
+
+  if (!environment.AGENT_FETCH_PROFILE && config.agentBrowser?.profile) {
+    environment.AGENT_FETCH_PROFILE = config.agentBrowser.profile
+  }
+
+  if (!environment.AGENT_FETCH_AGENT_BROWSER_COMMAND && config.agentBrowser?.command) {
+    environment.AGENT_FETCH_AGENT_BROWSER_COMMAND = config.agentBrowser.command
+  }
+
+  return environment
+}
 
 export const loadRuntimeConfig = async (
   options: LoadRuntimeConfigOptions = {},
@@ -160,27 +188,15 @@ export const loadRuntimeConfig = async (
     options.configPath ?? process.env.AGENT_FETCH_CONFIG_PATH ?? DEFAULT_CONFIG_PATH,
   )
 
-  const envFilePath = resolvePath(
-    options.envFilePath ?? process.env.AGENT_FETCH_SHARED_ENV_PATH ?? DEFAULT_ENV_PATH,
-  )
-
-  const sharedEnv = await readEnvFile(envFilePath)
-  const environment = {
-    ...sharedEnv,
-    ...Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string',
-      ),
-    ),
-  }
-
   const fileConfig = readJsonConfig(configPath)
-  const envConfig = buildEnvOverrides(environment)
+  const processEnvironment = getProcessEnvironment()
+  const envConfig = buildEnvOverrides(processEnvironment)
+  const config = mergeConfig(fileConfig, envConfig)
+  const environment = buildRuntimeEnvironment(config, processEnvironment)
 
   return {
-    config: mergeConfig(fileConfig, envConfig),
+    config,
     environment,
     configPath,
-    sharedEnvPath: envFilePath,
   }
 }

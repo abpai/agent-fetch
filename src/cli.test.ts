@@ -35,6 +35,7 @@ describe('agent-fetch CLI parsing', () => {
       'scrape.do',
       '--profile',
       '/tmp/profile',
+      '--headed',
       '--no-jsdom',
       '--no-plugins',
       '--timeout',
@@ -51,6 +52,7 @@ describe('agent-fetch CLI parsing', () => {
       configPath: undefined,
       method: 'scrape-do',
       profile: '/tmp/profile',
+      headed: true,
       outputMode: undefined,
       noJsdom: true,
       noPlugins: true,
@@ -79,6 +81,7 @@ describe('agent-fetch CLI parsing', () => {
       configPath: undefined,
       method: undefined,
       profile: undefined,
+      headed: false,
       outputMode: 'html',
       noJsdom: false,
       noPlugins: false,
@@ -96,7 +99,6 @@ describe('agent-fetch CLI parsing', () => {
     expect(parsed).toEqual({
       command: 'setup',
       configPath: undefined,
-      envFilePath: undefined,
       noInput: true,
       overwrite: true,
     })
@@ -108,7 +110,6 @@ describe('agent-fetch CLI parsing', () => {
     expect(parsed).toEqual({
       command: 'setup',
       configPath: undefined,
-      envFilePath: undefined,
       noInput: true,
       overwrite: false,
     })
@@ -273,7 +274,6 @@ describe('agent-fetch setup', () => {
   it('replaces existing config when overwrite is enabled', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'agent-fetch-setup-'))
     const configPath = path.join(dir, 'config.json')
-    const envFilePath = path.join(dir, '.env')
 
     writeFileSync(
       configPath,
@@ -297,7 +297,6 @@ describe('agent-fetch setup', () => {
     await runSetupCommand({
       command: 'setup',
       configPath,
-      envFilePath,
       noInput: true,
       overwrite: true,
     })

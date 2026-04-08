@@ -24,5 +24,4 @@ export interface RuntimeConfig {
   config: AgentFetchConfig
   environment: Record<string, string>
   configPath: string
-  sharedEnvPath: string
 }

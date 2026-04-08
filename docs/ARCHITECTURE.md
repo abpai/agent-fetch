@@ -45,14 +45,8 @@ If that fails, command exits non-zero with actionable error details and does not
 
 Config files:
 
-- `~/.config/agent-fetch/config.json`
+- `~/.agent-fetch/config.json`
 - optional override: `--config <path>` or `AGENT_FETCH_CONFIG_PATH`
-
-Shared env file:
-
-- `~/.agent-fetch/.env`
-- optional runtime override: `AGENT_FETCH_SHARED_ENV_PATH`
-- optional setup write path: `agent-fetch setup --env-file <path>`
 
 Precedence:
 
@@ -63,7 +57,7 @@ Precedence:
 Credential keys:
 
 - `AGENT_FETCH_PROFILE` (required for authenticated mode unless `--profile` is passed)
-- `AGENT_FETCH_AGENT_BROWSER_COMMAND` (optional command override)
+- `agentBrowser.command` in config (optional advanced command override)
 
 Legacy files are hard-rejected:
 

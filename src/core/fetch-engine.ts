@@ -163,6 +163,8 @@ export const fetchUrl = async (
   const headers = buildHeaders(options)
   const environment = options.environment ?? {}
 
+  const progress = options.onProgress
+
   const context = {
     timeoutMs,
     headers,
@@ -415,6 +417,7 @@ export const fetchUrl = async (
   let fetchedHtml: string | null = null
 
   if (enableFetch) {
+    progress?.('Trying fetch...')
     try {
       const run = await timed(() => runFetchStrategy(url, context))
       fetchedHtml = run.value
@@ -442,6 +445,7 @@ export const fetchUrl = async (
   }
 
   if (enableJsdom && mode === 'auto') {
+    progress?.('Trying jsdom...')
     try {
       const html = fetchedHtml ?? (await runFetchStrategy(url, context))
       const run = await timed(() => runJsdomStrategy(url, html, context))
@@ -467,6 +471,7 @@ export const fetchUrl = async (
       const resolvedPlugins = resolvePlugins(configs, environment)
 
       for (const { plugin, config } of resolvedPlugins) {
+        progress?.(`Trying plugin ${plugin.name}...`)
         try {
           const run = await timed(() =>
             plugin.fetch(url, config, {
@@ -495,6 +500,7 @@ export const fetchUrl = async (
   }
 
   if (enableAgentBrowser && mode === 'auto') {
+    progress?.('Trying agent-browser...')
     try {
       const run = await timed(() => runAgentBrowserStrategy(url, context, false))
       const extracted = await extractFromHtml(url, run.value, 'agent-browser', outputMode)

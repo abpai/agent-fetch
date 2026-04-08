@@ -10,10 +10,15 @@ interface FetchCommandDependencies {
   error: (message: string) => void
 }
 
-const resolveStrategyMode = (command: FetchCommand): StrategyMode =>
-  command.withCredentials || command.strategy === 'authenticated'
-    ? 'authenticated'
-    : command.strategy
+const resolveStrategyMode = (
+  command: FetchCommand,
+  configMode?: StrategyMode,
+): StrategyMode => {
+  if (command.withCredentials || command.strategy === 'authenticated') {
+    return 'authenticated'
+  }
+  return command.strategy ?? configMode ?? 'auto'
+}
 
 const resolveOutputMode = (
   command: FetchCommand,
@@ -46,8 +51,10 @@ export const runFetchCommand = async (
   dependencies: FetchCommandDependencies,
 ): Promise<number> => {
   try {
-    const strategyMode = resolveStrategyMode(command)
+    const runtime = await loadRuntimeConfig({ configPath: command.configPath })
+    const strategyMode = resolveStrategyMode(command, runtime.config.strategyMode)
     const method = command.method
+    const outputMode = resolveOutputMode(command, runtime.config.outputMode)
 
     if (strategyMode === 'authenticated' && command.noAgentBrowser) {
       dependencies.error(
@@ -55,9 +62,6 @@ export const runFetchCommand = async (
       )
       return 2
     }
-
-    const runtime = await loadRuntimeConfig({ configPath: command.configPath })
-    const outputMode = resolveOutputMode(command, runtime.config.outputMode)
 
     if (outputMode === 'screenshot' && command.noAgentBrowser) {
       dependencies.error('`screenshot` mode requires agent-browser to be enabled.')
@@ -117,8 +121,10 @@ export const runFetchCommand = async (
       environment: runtime.environment,
       agentBrowser: {
         ...runtime.config.agentBrowser,
+        ...(command.headed ? { headed: true } : {}),
         ...(command.profile ? { profile: command.profile } : {}),
       },
+      onProgress: (message: string) => dependencies.error(message),
     }
 
     const result = await fetchUrl(command.url, options)

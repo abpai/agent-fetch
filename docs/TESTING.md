@@ -200,45 +200,39 @@ SCRAPEDO_TOKEN=your_actual_token agent-fetch fetch https://news.ycombinator.com 
 tmpdir="$(mktemp -d)"
 
 # Interactive setup (requires TTY)
-agent-fetch setup --config "$tmpdir/config.json" --env-file "$tmpdir/.env"
+agent-fetch setup --config "$tmpdir/config.json"
 # Enter: browser profile path when configuring authenticated browser access
-# Creates $tmpdir/config.json and $tmpdir/.env
+# Creates $tmpdir/config.json
 
 # Verify
 cat "$tmpdir/config.json"
-cat "$tmpdir/.env"
 
 # Non-interactive setup with general defaults only
 AGENT_FETCH_TIMEOUT=15000 \
 AGENT_FETCH_ENABLE_AGENT_BROWSER=false \
   agent-fetch setup --no-input --overwrite \
-  --config "$tmpdir/config.json" \
-  --env-file "$tmpdir/.env"
+  --config "$tmpdir/config.json"
 
 # Authenticated non-interactive setup requires a profile
 AGENT_FETCH_STRATEGY_MODE=authenticated \
 AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
   agent-fetch setup --no-input --overwrite \
-  --config "$tmpdir/config.json" \
-  --env-file "$tmpdir/.env"
+  --config "$tmpdir/config.json"
 
 # Authenticated non-interactive setup without required env (should fail)
 env -u AGENT_FETCH_PROFILE \
   AGENT_FETCH_STRATEGY_MODE=authenticated \
   agent-fetch setup --no-input --overwrite \
-  --config "$tmpdir/config.json" \
-  --env-file "$tmpdir/.env"
+  --config "$tmpdir/config.json"
 # Error: "Missing environment value: AGENT_FETCH_PROFILE"
 
-# With explicit command override
-AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
-AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser \
-  AGENT_FETCH_STRATEGY_MODE=authenticated \
+# With env-backed scrape.do placeholder
+SCRAPEDO_TOKEN=your-token \
+AGENT_FETCH_ENABLE_PLUGINS=true \
   agent-fetch setup --no-input --overwrite \
-  --config "$tmpdir/config.json" \
-  --env-file "$tmpdir/.env"
-cat "$tmpdir/.env"
-# Should contain AGENT_FETCH_PROFILE and AGENT_FETCH_AGENT_BROWSER_COMMAND
+  --config "$tmpdir/config.json"
+cat "$tmpdir/config.json"
+# Should contain ${SCRAPEDO_TOKEN} in the scrape-do plugin config
 ```
 
 ---
@@ -259,15 +253,18 @@ agent-fetch fetch https://example.com --strategy authenticated --json
 # One-off profile override
 agent-fetch fetch https://example.com --with-credentials --profile ~/.agent-browser/profiles/work --json
 
-# Fail-fast test (missing profile, ignoring any shared env defaults)
-AGENT_FETCH_SHARED_ENV_PATH=/tmp/agent-fetch-empty.env \
-  env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials --json
+# Fail-fast test (missing profile, with a config that has no saved browser profile)
+printf '{ "enableAgentBrowser": true, "strategyMode": "authenticated" }\n' >/tmp/agent-fetch-empty.json
+env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com \
+  --config /tmp/agent-fetch-empty.json \
+  --with-credentials --json
 # Immediate failure: "Authenticated fetch failed via agent-browser"
 
 # Verify exit code
 agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 0
-AGENT_FETCH_SHARED_ENV_PATH=/tmp/agent-fetch-empty.env \
-  env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com --with-credentials; echo "exit: $?"  # 1
+env -u AGENT_FETCH_PROFILE agent-fetch fetch https://example.com \
+  --config /tmp/agent-fetch-empty.json \
+  --with-credentials; echo "exit: $?"  # 1
 ```
 
 ---
