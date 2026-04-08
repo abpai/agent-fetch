@@ -76,6 +76,7 @@ export interface FetchOptions {
   blockedWordCountThreshold?: number
   agentBrowser?: AgentBrowserOptions
   environment?: Record<string, string>
+  onProgress?: (message: string) => void
 }
 
 export interface FetchEngineContext {

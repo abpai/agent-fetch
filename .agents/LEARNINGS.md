@@ -51,4 +51,8 @@
 
 ## 2026-04-07
 - When README examples describe remote access to `agent-fetch server`, include the required bind host explicitly (`--host 0.0.0.0`); the default server host is localhost-only and makes tailnet examples misleading.
-- For `agent-browser` debugging flags in this repo, thread `--headed` only into the `open` launch command; reusing it on follow-up commands like `wait` or `get` is unnecessary and can make the CLI integration more brittle.
+- For `agent-browser` flags like `--headed` and `--profile`, pass them consistently on every command in a workflow; omitting them on follow-up commands like `wait` or `get` causes the daemon to reject the request as conflicting options.
+
+## 2026-04-08
+- This repo now treats `~/.agent-fetch/config.json` as the only default persisted config location; remove `.env`-specific setup/runtime/docs in the same change instead of leaving split storage behavior behind.
+- For scrape.do setup here, keep `${SCRAPEDO_TOKEN}` interpolation working from `process.env` even after moving to JSON-only config, and cover both literal-token and placeholder-token flows in tests/docs.

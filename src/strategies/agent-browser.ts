@@ -1,5 +1,5 @@
 import { mkdtemp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { DEFAULT_TIMEOUT_MS } from '../core/http'
 import type { FetchEngineContext } from '../core/types'
@@ -86,26 +86,38 @@ const runCheckedCommand = async (
   timeoutMs: number,
   action: string,
   profile?: string,
+  checkProfile = false,
 ): Promise<CommandResult> => {
   const result = await runCommand(command, args, timeoutMs)
   if (result.code !== 0) {
     commandFailed(action, result)
   }
 
-  ensureProfileApplied(action, result, profile)
+  if (checkProfile) {
+    ensureProfileApplied(action, result, profile)
+  }
 
   return result
 }
 
-const resolveProfile = (context: FetchEngineContext): string | undefined =>
-  context.options.agentBrowser?.profile ||
-  context.environment.AGENT_FETCH_PROFILE ||
-  process.env.AGENT_FETCH_PROFILE
+const expandTilde = (value: string): string => {
+  if (value === '~') return homedir()
+  if (value.startsWith('~/')) return path.join(homedir(), value.slice(2))
+  return value
+}
+
+const resolveProfile = (context: FetchEngineContext): string | undefined => {
+  const raw =
+    context.options.agentBrowser?.profile ||
+    context.environment.AGENT_FETCH_PROFILE ||
+    process.env.AGENT_FETCH_PROFILE
+
+  return raw ? expandTilde(raw) : undefined
+}
 
 const buildCommandArgs = (
   workflow: BrowserWorkflow,
   args: string[],
-  includeHeaded = false,
 ): string[] => {
   const commandArgs: string[] = []
 
@@ -113,7 +125,7 @@ const buildCommandArgs = (
     commandArgs.push('--profile', workflow.profile)
   }
 
-  if (includeHeaded && workflow.headed) {
+  if (workflow.headed) {
     commandArgs.push('--headed')
   }
 
@@ -126,22 +138,38 @@ const runWorkflowCommand = (
   workflow: BrowserWorkflow,
   args: string[],
   action: string,
-  includeHeaded = false,
+  checkProfile = false,
 ): Promise<CommandResult> =>
   runCheckedCommand(
     workflow.command,
-    buildCommandArgs(workflow, args, includeHeaded),
+    buildCommandArgs(workflow, args),
     workflow.timeoutMs,
     action,
     workflow.profile,
+    checkProfile,
   )
+
+const isProfileIgnoredError = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes('agent-browser ignored the requested profile')
+
+const closeBrowser = async (workflow: BrowserWorkflow): Promise<void> => {
+  await runCommand(workflow.command, ['close'], workflow.timeoutMs)
+}
 
 const openPage = async (
   workflow: BrowserWorkflow,
   url: string,
   waitForNetworkIdle: boolean,
 ): Promise<void> => {
-  await runWorkflowCommand(workflow, ['open', url], 'agent-browser open', true)
+  try {
+    await runWorkflowCommand(workflow, ['open', url], 'agent-browser open', true)
+  } catch (error) {
+    if (!isProfileIgnoredError(error)) {
+      throw error
+    }
+    await closeBrowser(workflow)
+    await runWorkflowCommand(workflow, ['open', url], 'agent-browser open', true)
+  }
 
   const loadState = waitForNetworkIdle ? 'networkidle' : 'load'
   await runWorkflowCommand(

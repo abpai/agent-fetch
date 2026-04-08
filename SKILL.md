@@ -64,10 +64,7 @@ AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work \
   agent-fetch setup --no-input --overwrite
 ```
 
-`setup` writes (by default):
-
-- `~/.config/agent-fetch/config.json`
-- `~/.agent-fetch/.env`
+`setup` writes `~/.agent-fetch/config.json` by default.
 
 ## Plugins
 

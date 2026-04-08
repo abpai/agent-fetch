@@ -145,8 +145,8 @@ agent-fetch setup
 # Alias
 agent-fetch init
 
-# Write setup artifacts somewhere other than the defaults
-agent-fetch setup --config /tmp/agent-fetch.json --env-file /tmp/agent-fetch.env
+# Write config somewhere other than the default
+agent-fetch setup --config /tmp/agent-fetch.json
 
 # Non-interactive setup from env vars
 AGENT_FETCH_TIMEOUT=45000 \
@@ -222,8 +222,8 @@ AGENT_FETCH_ENABLE_PLUGINS=true \
 agent-fetch setup --no-input --overwrite
 ```
 
-That writes `SCRAPEDO_TOKEN` to `~/.agent-fetch/.env` and configures the built-in
-`scrape-do` plugin in `~/.config/agent-fetch/config.json`.
+That writes the built-in `scrape-do` plugin to `~/.agent-fetch/config.json`
+using `${SCRAPEDO_TOKEN}` interpolation.
 
 You can also wire it manually:
 
@@ -255,7 +255,7 @@ agent-fetch server
 agent-fetch server --port 8080 --host 0.0.0.0
 
 # With a config file for default fetch options
-agent-fetch server --config ~/.config/agent-fetch/config.json
+agent-fetch server --config ~/.agent-fetch/config.json
 ```
 
 POST a URL to fetch it:
@@ -305,21 +305,13 @@ agent-fetch plugins list --json
 
 Default config path:
 
-- `~/.config/agent-fetch/config.json`
+- `~/.agent-fetch/config.json`
 - override with `--config <path>` or `AGENT_FETCH_CONFIG_PATH`
-
-Default shared env path:
-
-- `~/.agent-fetch/.env`
-- override with `AGENT_FETCH_SHARED_ENV_PATH` for runtime loading
-- use `agent-fetch setup --env-file <path>` to write setup output somewhere else
-
-The config file stores runtime defaults. The shared env file stores machine-specific values and secrets such as `AGENT_FETCH_PROFILE`, `AGENT_FETCH_AGENT_BROWSER_COMMAND`, and `SCRAPEDO_TOKEN`.
 
 At runtime, precedence is:
 
 1. CLI flags
-2. environment variables (including the shared `.env` file)
+2. environment variables
 3. config file
 4. built-in defaults
 
@@ -349,23 +341,8 @@ Notes:
 - `waitForNetworkIdle` affects `agent-browser` navigation timing.
 - Plugin config values support `${ENV_VAR}` interpolation.
 - `plugins` are only used in `auto` mode, after `fetch` and `jsdom`.
-
-Example shared env file:
-
-```bash
-AGENT_FETCH_PROFILE=~/.agent-browser/profiles/work
-AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser
-SCRAPEDO_TOKEN=your-token
-```
-
-`AGENT_FETCH_AGENT_BROWSER_COMMAND` is optional. Set it only when `agent-fetch`
-should invoke something other than plain `agent-browser`, such as a wrapper
-script or an absolute binary path. If you need extra flags, put them in the
-wrapper script instead of the command string:
-
-```bash
-AGENT_FETCH_AGENT_BROWSER_COMMAND=/opt/bin/agent-browser-wrapper
-```
+- `agentBrowser.profile` is the normal place to persist authenticated browser state.
+- `agentBrowser.command` is an advanced override when `agent-fetch` should invoke something other than plain `agent-browser`.
 
 ### Legacy config behavior
 
@@ -374,7 +351,7 @@ Legacy config files are now rejected with a hard error:
 - `.fetchrc.json`
 - `fetch.config.json`
 
-Move settings to `~/.config/agent-fetch/config.json`.
+Move settings to `~/.agent-fetch/config.json`.
 
 ### Supported setup env vars
 
@@ -392,7 +369,6 @@ Move settings to `~/.config/agent-fetch/config.json`.
 - `AGENT_FETCH_MIN_WORD_COUNT`
 - `AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD`
 - `AGENT_FETCH_PROFILE`
-- `AGENT_FETCH_AGENT_BROWSER_COMMAND`
 - `SCRAPEDO_TOKEN`
 
 ## Library usage

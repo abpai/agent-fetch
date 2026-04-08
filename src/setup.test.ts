@@ -55,12 +55,11 @@ afterEach(async () => {
 })
 
 describe('agent-fetch setup wizard', () => {
-  it('writes interactive fetch defaults, plugin config, and browser env values', async () => {
+  it('writes interactive fetch defaults, plugin config, and browser values to config', async () => {
     setTTY(true)
     const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
     tempDirs.push(tempDir)
     const configPath = join(tempDir, 'config.json')
-    const envFilePath = join(tempDir, '.env')
 
     const prompts = { confirm: 0, select: 0, text: 0 }
 
@@ -97,7 +96,6 @@ describe('agent-fetch setup wizard', () => {
     await runSetupCommand({
       command: 'setup',
       configPath,
-      envFilePath,
       noInput: false,
       overwrite: false,
     })
@@ -116,8 +114,8 @@ describe('agent-fetch setup wizard', () => {
       minWordCount: number
       blockedWordCountThreshold: number
       plugins: Array<{ type: string; token: string }>
+      agentBrowser: { profile: string }
     }
-    const envFile = await readFile(envFilePath, 'utf8')
 
     expect(config.timeout).toBe(45_000)
     expect(config.enableFetch).toBe(true)
@@ -131,16 +129,16 @@ describe('agent-fetch setup wizard', () => {
     expect(config.minMarkdownLength).toBe(80)
     expect(config.minWordCount).toBe(20)
     expect(config.blockedWordCountThreshold).toBe(10)
-    expect(config.plugins).toEqual([{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }])
-    expect(envFile).toContain('AGENT_FETCH_PROFILE="~/.agent-browser/profiles/test"')
-    expect(envFile).toContain('SCRAPEDO_TOKEN=scrape-token-123')
+    expect(config.plugins).toEqual([{ type: 'scrape-do', token: 'scrape-token-123' }])
+    expect(config.agentBrowser).toEqual({
+      profile: '~/.agent-browser/profiles/test',
+    })
   })
 
   it('writes no-input config from Bun env defaults without requiring browser settings', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
     tempDirs.push(tempDir)
     const configPath = join(tempDir, 'config.json')
-    const envFilePath = join(tempDir, '.env')
 
     process.env.AGENT_FETCH_TIMEOUT = '15000'
     process.env.AGENT_FETCH_ENABLE_FETCH = 'false'
@@ -162,7 +160,6 @@ describe('agent-fetch setup wizard', () => {
     await runSetupCommand({
       command: 'setup',
       configPath,
-      envFilePath,
       noInput: true,
       overwrite: true,
     })
@@ -183,7 +180,6 @@ describe('agent-fetch setup wizard', () => {
       blockedWordCountThreshold: number
       plugins: Array<{ type: string; token: string }>
     }
-    const envFile = await readFile(envFilePath, 'utf8')
 
     expect(config.timeout).toBe(15_000)
     expect(config.outputMode).toBe('html')
@@ -199,14 +195,12 @@ describe('agent-fetch setup wizard', () => {
     expect(config.minWordCount).toBe(12)
     expect(config.blockedWordCountThreshold).toBe(6)
     expect(config.plugins).toEqual([{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }])
-    expect(envFile.trim()).toBe('SCRAPEDO_TOKEN=env-scrape-token')
   })
 
   it('writes agent-browser command for authenticated no-input setup when provided', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
     tempDirs.push(tempDir)
     const configPath = join(tempDir, 'config.json')
-    const envFilePath = join(tempDir, '.env')
 
     process.env.AGENT_FETCH_STRATEGY_MODE = 'authenticated'
     process.env.AGENT_FETCH_ENABLE_AGENT_BROWSER = 'true'
@@ -217,13 +211,17 @@ describe('agent-fetch setup wizard', () => {
     await runSetupCommand({
       command: 'setup',
       configPath,
-      envFilePath,
       noInput: true,
       overwrite: true,
     })
 
-    const envFile = await readFile(envFilePath, 'utf8')
-    expect(envFile).toContain('AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser')
+    const config = JSON.parse(await readFile(configPath, 'utf8')) as {
+      agentBrowser: { profile: string; command: string }
+    }
+    expect(config.agentBrowser).toEqual({
+      profile: '~/.agent-browser/profiles/auth',
+      command: 'agent-browser',
+    })
   })
 
   it('preserves an existing agent-browser command during interactive setup', async () => {
@@ -231,14 +229,19 @@ describe('agent-fetch setup wizard', () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
     tempDirs.push(tempDir)
     const configPath = join(tempDir, 'config.json')
-    const envFilePath = join(tempDir, '.env')
 
     await Bun.write(
-      envFilePath,
-      [
-        'AGENT_FETCH_PROFILE=~/.agent-browser/profiles/existing',
-        'AGENT_FETCH_AGENT_BROWSER_COMMAND=agent-browser --sandbox',
-      ].join('\n') + '\n',
+      configPath,
+      `${JSON.stringify(
+        {
+          agentBrowser: {
+            profile: '~/.agent-browser/profiles/existing',
+            command: 'agent-browser --sandbox',
+          },
+        },
+        null,
+        2,
+      )}\n`,
     )
 
     mock.module('@clack/prompts', () => ({
@@ -264,15 +267,14 @@ describe('agent-fetch setup wizard', () => {
     await runSetupCommand({
       command: 'setup',
       configPath,
-      envFilePath,
       noInput: false,
       overwrite: false,
     })
 
-    const envFile = await readFile(envFilePath, 'utf8')
-    expect(envFile).toContain(
-      'AGENT_FETCH_AGENT_BROWSER_COMMAND="agent-browser --sandbox"',
-    )
+    const config = JSON.parse(await readFile(configPath, 'utf8')) as {
+      agentBrowser: { command: string }
+    }
+    expect(config.agentBrowser.command).toBe('agent-browser --sandbox')
   })
 
   it('requires AGENT_FETCH_PROFILE for authenticated no-input setup', async () => {
@@ -289,7 +291,6 @@ describe('agent-fetch setup wizard', () => {
       runSetupCommand({
         command: 'setup',
         configPath: join(tempDir, 'config.json'),
-        envFilePath: join(tempDir, '.env'),
         noInput: true,
         overwrite: true,
       }),
@@ -304,7 +305,6 @@ describe('agent-fetch setup wizard', () => {
       runSetupCommand({
         command: 'setup',
         configPath: join(tmpdir(), 'unused-config.json'),
-        envFilePath: join(tmpdir(), 'unused.env'),
         noInput: false,
         overwrite: false,
       }),
@@ -316,7 +316,6 @@ describe('agent-fetch setup wizard', () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'agent-fetch-setup-'))
     tempDirs.push(tempDir)
     const configPath = join(tempDir, 'config.json')
-    const envFilePath = join(tempDir, '.env')
 
     await Bun.write(
       configPath,
@@ -362,7 +361,6 @@ describe('agent-fetch setup wizard', () => {
     await runSetupCommand({
       command: 'setup',
       configPath,
-      envFilePath,
       noInput: false,
       overwrite: false,
     })

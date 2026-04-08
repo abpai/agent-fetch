@@ -14,14 +14,13 @@ export interface FetchCommand {
   noAgentBrowser: boolean
   timeout?: number
   withCredentials: boolean
-  strategy: 'auto' | 'simple' | 'authenticated'
+  strategy?: 'auto' | 'simple' | 'authenticated'
   debugAttempts: boolean
 }
 
 export interface SetupCommand {
   command: 'setup'
   configPath?: string
-  envFilePath?: string
   noInput: boolean
   overwrite: boolean
 }

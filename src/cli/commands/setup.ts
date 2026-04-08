@@ -10,8 +10,7 @@ import {
 } from '@clack/prompts'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { readEnvFile, writeEnvFile } from '../../config/env-file'
-import { getDefaultConfigPath, getDefaultEnvPath } from '../../config/loader'
+import { getDefaultConfigPath } from '../../config/loader'
 import type { AgentFetchConfig } from '../../config/types'
 import type { OutputMode, StrategyMode } from '../../core/types'
 import type { SetupCommand } from '../types'
@@ -31,7 +30,6 @@ const SETUP_CANCELED_MESSAGE = 'Setup canceled.'
 
 interface SetupArtifacts {
   config: AgentFetchConfig
-  envValues: Record<string, string>
 }
 
 const resolvePath = (value: string): string => {
@@ -44,31 +42,6 @@ const resolvePath = (value: string): string => {
   }
 
   return value
-}
-
-const buildEnvValues = (profile: string, command?: string): Record<string, string> => {
-  const values: Record<string, string> = {}
-
-  if (profile.trim()) {
-    values.AGENT_FETCH_PROFILE = profile.trim()
-  }
-
-  if (command?.trim()) {
-    values.AGENT_FETCH_AGENT_BROWSER_COMMAND = command.trim()
-  }
-
-  return values
-}
-
-const addEnvValue = (
-  values: Record<string, string>,
-  key: string,
-  value: string | undefined,
-): void => {
-  const normalized = value?.trim()
-  if (normalized) {
-    values[key] = normalized
-  }
 }
 
 const throwIfCanceled = <T>(result: T | symbol): T => {
@@ -292,8 +265,23 @@ const confirmOverwriteIfNeeded = async (
 const getCurrentPluginToken = (environment: Record<string, string | undefined>): string =>
   environment.SCRAPEDO_TOKEN ?? process.env.SCRAPEDO_TOKEN ?? ''
 
+const buildScrapeDoPluginConfig = (token: string): AgentFetchConfig['plugins'] => {
+  const normalized = token.trim()
+  if (!normalized) {
+    return []
+  }
+
+  return [{ type: 'scrape-do', token: normalized }]
+}
+
 const hasScrapeDoPlugin = (config: AgentFetchConfig): boolean =>
   (config.plugins ?? []).some((entry) => entry.type === 'scrape-do')
+
+const getConfiguredScrapeDoToken = (config: AgentFetchConfig): string => {
+  const plugin = (config.plugins ?? []).find((entry) => entry.type === 'scrape-do')
+  const token = plugin?.token
+  return typeof token === 'string' ? token : ''
+}
 
 const buildArtifactsFromEnv = (): SetupArtifacts => {
   const strategyMode =
@@ -315,6 +303,7 @@ const buildArtifactsFromEnv = (): SetupArtifacts => {
   }
 
   const scrapeDoToken = getCurrentPluginToken(process.env)
+  const currentAgentBrowserCommand = process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND?.trim()
   const config: AgentFetchConfig = {
     outputMode: parseOutputMode(process.env.AGENT_FETCH_OUTPUT_MODE),
     timeout:
@@ -332,13 +321,11 @@ const buildArtifactsFromEnv = (): SetupArtifacts => {
     minMarkdownLength: envPositiveInt('AGENT_FETCH_MIN_MARKDOWN_LENGTH'),
     minWordCount: envPositiveInt('AGENT_FETCH_MIN_WORD_COUNT'),
     blockedWordCountThreshold: envPositiveInt('AGENT_FETCH_BLOCKED_WORD_COUNT_THRESHOLD'),
-    plugins:
-      enablePlugins && scrapeDoToken
-        ? [{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }]
-        : [],
+    plugins: enablePlugins
+      ? buildScrapeDoPluginConfig(scrapeDoToken ? '${SCRAPEDO_TOKEN}' : '')
+      : [],
   }
 
-  const envValues: Record<string, string> = {}
   if (enableAgentBrowser) {
     const profile = (process.env.AGENT_FETCH_PROFILE ?? '').trim()
     if (strategyMode === 'authenticated' && !profile) {
@@ -347,27 +334,20 @@ const buildArtifactsFromEnv = (): SetupArtifacts => {
       )
     }
 
-    Object.assign(
-      envValues,
-      buildEnvValues(profile, process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND),
-    )
+    config.agentBrowser = {
+      ...(profile ? { profile } : {}),
+      ...(currentAgentBrowserCommand ? { command: currentAgentBrowserCommand } : {}),
+    }
   }
 
-  if (enablePlugins && scrapeDoToken) {
-    addEnvValue(envValues, 'SCRAPEDO_TOKEN', scrapeDoToken)
-  }
-
-  return { config, envValues }
+  return { config }
 }
 
 export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
   const configPath = resolvePath(command.configPath ?? getDefaultConfigPath())
-  const envFilePath = resolvePath(command.envFilePath ?? getDefaultEnvPath())
 
   if (command.noInput) {
-    const { config, envValues } = buildArtifactsFromEnv()
-
-    await writeEnvFile(envFilePath, envValues, command.overwrite)
+    const { config } = buildArtifactsFromEnv()
     await writeConfigFile(configPath, command.overwrite, config)
     return
   }
@@ -375,7 +355,6 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
   ensureInteractiveTerminal()
 
   const existingConfig = await readJsonConfigFile(configPath)
-  const existingEnv = await readEnvFile(envFilePath)
   const currentConfig: AgentFetchConfig = {
     ...DEFAULT_CONFIG,
     ...existingConfig,
@@ -456,9 +435,10 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
 
   const scrapeDoToken = configureScrapeDo
     ? await promptOptionalText({
-        message: 'SCRAPEDO_TOKEN',
-        initialValue: getCurrentPluginToken(existingEnv),
-        placeholder: 'Paste your scrape.do token',
+        message: 'scrape.do token or ${ENV_VAR}',
+        initialValue:
+          getConfiguredScrapeDoToken(currentConfig) || getCurrentPluginToken(process.env),
+        placeholder: 'Paste token or use ${SCRAPEDO_TOKEN}',
       })
     : ''
 
@@ -537,20 +517,17 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
   }
 
   const currentProfile =
-    existingEnv.AGENT_FETCH_PROFILE ??
     process.env.AGENT_FETCH_PROFILE ??
     currentConfig.agentBrowser?.profile ??
     DEFAULT_PROFILE_PATH
   const currentAgentBrowserCommand =
-    existingEnv.AGENT_FETCH_AGENT_BROWSER_COMMAND ??
-    process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND ??
-    currentConfig.agentBrowser?.command
+    process.env.AGENT_FETCH_AGENT_BROWSER_COMMAND ?? currentConfig.agentBrowser?.command
 
   const profile = enableAgentBrowser
     ? strategyMode === 'authenticated'
       ? await promptRequiredText({
           message:
-            process.env.AGENT_FETCH_PROFILE || existingEnv.AGENT_FETCH_PROFILE
+            process.env.AGENT_FETCH_PROFILE || currentConfig.agentBrowser?.profile
               ? 'AGENT_FETCH_PROFILE (current value available)'
               : 'AGENT_FETCH_PROFILE',
           placeholder: DEFAULT_PROFILE_PATH,
@@ -560,7 +537,7 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
         })
       : await promptOptionalText({
           message:
-            process.env.AGENT_FETCH_PROFILE || existingEnv.AGENT_FETCH_PROFILE
+            process.env.AGENT_FETCH_PROFILE || currentConfig.agentBrowser?.profile
               ? 'AGENT_FETCH_PROFILE (optional, current value available)'
               : 'AGENT_FETCH_PROFILE (optional)',
           placeholder: DEFAULT_PROFILE_PATH,
@@ -568,21 +545,10 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
         })
     : ''
 
-  const shouldWriteFiles = await confirmOverwriteIfNeeded(
-    [envFilePath, configPath],
-    command.overwrite,
-  )
+  const shouldWriteFiles = await confirmOverwriteIfNeeded([configPath], command.overwrite)
   if (!shouldWriteFiles) {
     outro('No changes made.')
     return
-  }
-
-  const envValues: Record<string, string> = {}
-  if (enableAgentBrowser) {
-    Object.assign(envValues, buildEnvValues(profile, currentAgentBrowserCommand))
-  }
-  if (enablePlugins && scrapeDoToken) {
-    addEnvValue(envValues, 'SCRAPEDO_TOKEN', scrapeDoToken)
   }
 
   const config: AgentFetchConfig = {
@@ -594,18 +560,23 @@ export const runSetupCommand = async (command: SetupCommand): Promise<void> => {
     enablePlugins,
     enableAgentBrowser,
     strategyMode,
-    plugins:
-      enablePlugins && scrapeDoToken
-        ? [{ type: 'scrape-do', token: '${SCRAPEDO_TOKEN}' }]
-        : [],
+    plugins: enablePlugins ? buildScrapeDoPluginConfig(scrapeDoToken) : [],
     minHtmlLength,
     minMarkdownLength,
     minWordCount,
     blockedWordCountThreshold,
+    agentBrowser:
+      enableAgentBrowser && (profile || currentAgentBrowserCommand)
+        ? {
+            ...(profile ? { profile } : {}),
+            ...(currentAgentBrowserCommand
+              ? { command: currentAgentBrowserCommand }
+              : {}),
+          }
+        : undefined,
   }
 
-  await writeEnvFile(envFilePath, envValues, true)
   await writeConfigFile(configPath, true, config)
 
-  outro(`Saved setup to ${envFilePath} and ${configPath}`)
+  outro(`Saved setup to ${configPath}`)
 }

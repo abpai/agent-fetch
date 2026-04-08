@@ -32,13 +32,12 @@ if (process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_IGNORED === '1' && args.includes
   console.error("⚠ --profile ignored: daemon already running. Use 'agent-browser close' first to restart with new options.")
 }
 
-if (process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED === '1' && args.includes('open') && !args.includes('--headed')) {
-  console.error('expected --headed flag on open')
-  process.exit(1)
+if (process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_ON_WAIT === '1' && args.includes('--profile') && args.includes('wait')) {
+  console.error("⚠ --profile ignored: daemon already running. Use 'agent-browser close' first to restart with new options.")
 }
 
-if (process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED === '1' && !args.includes('open') && args.includes('--headed')) {
-  console.error('unexpected --headed flag outside open')
+if (process.env.MOCK_AGENT_BROWSER_REQUIRE_HEADED === '1' && !args.includes('--headed')) {
+  console.error('expected --headed flag on every command')
   process.exit(1)
 }
 
@@ -208,6 +207,29 @@ describe('agent-fetch engine', () => {
       )
     } finally {
       delete process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_IGNORED
+    }
+  })
+
+  it('tolerates profile-ignored warnings on follow-up commands like wait', async () => {
+    process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_ON_WAIT = '1'
+
+    try {
+      const result = await fetchUrl(baseUrl, {
+        withCredentials: true,
+        agentBrowser: {
+          profile: '/tmp/test-profile',
+          command: mockAgentBrowserPath,
+        },
+        minHtmlLength: 20,
+        minWordCount: 3,
+        minMarkdownLength: 20,
+      })
+
+      expect(result.strategy).toBe('agent-browser')
+      expect(result.attempts).toHaveLength(1)
+      expect(result.attempts[0]?.ok).toBe(true)
+    } finally {
+      delete process.env.MOCK_AGENT_BROWSER_WARN_PROFILE_ON_WAIT
     }
   })
 

@@ -214,7 +214,6 @@ function registerFetchCommand(
       '--strategy <mode>',
       'Strategy mode: auto, simple, authenticated',
       parseStrategyMode,
-      'auto',
     )
     .option('--debug-attempts', 'Print per-attempt details to stderr')
     .action(
@@ -232,7 +231,7 @@ function registerFetchCommand(
           agentBrowser?: boolean
           timeout?: number
           withCredentials?: boolean
-          strategy: 'auto' | 'simple' | 'authenticated'
+          strategy?: 'auto' | 'simple' | 'authenticated'
           debugAttempts?: boolean
         },
       ) => {
@@ -265,29 +264,17 @@ function registerSetupCommand(
     .command('setup')
     .alias('init')
     .description('Guided setup for authenticated browser credentials and defaults')
-    .option(
-      '--config <path>',
-      'Config file path (default: ~/.config/agent-fetch/config.json)',
-    )
-    .option('--env-file <path>', 'Env file path (default: ~/.agent-fetch/.env)')
+    .option('--config <path>', 'Config file path (default: ~/.agent-fetch/config.json)')
     .option('--no-input', 'Disable interactive prompts')
-    .option('--overwrite', 'Overwrite existing setup files')
-    .action(
-      (options: {
-        config?: string
-        envFile?: string
-        input?: boolean
-        overwrite?: boolean
-      }) => {
-        onParse({
-          command: 'setup',
-          configPath: options.config,
-          envFilePath: options.envFile,
-          noInput: options.input === false,
-          overwrite: options.overwrite === true,
-        } satisfies SetupCommand)
-      },
-    )
+    .option('--overwrite', 'Overwrite existing setup config')
+    .action((options: { config?: string; input?: boolean; overwrite?: boolean }) => {
+      onParse({
+        command: 'setup',
+        configPath: options.config,
+        noInput: options.input === false,
+        overwrite: options.overwrite === true,
+      } satisfies SetupCommand)
+    })
 }
 
 function registerPluginsCommand(
