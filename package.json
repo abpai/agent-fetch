@@ -1,6 +1,6 @@
 {
   "name": "@andypai/agent-fetch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agent-first robust URL fetch CLI with smart fallback strategies.",
   "type": "module",
   "main": "src/index.ts",
