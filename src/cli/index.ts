@@ -4,6 +4,7 @@ import { runPluginsListCommand } from './commands/plugins'
 import { runServerCommand } from './commands/server'
 import { runSetupCommand } from './commands/setup'
 import type { OutputMode } from '../core/types'
+import packageJson from '../../package.json'
 import type {
   FetchCommand,
   ParsedCommand,
@@ -94,6 +95,16 @@ function parseCli(argv: string[]): ParseResult {
       }
     }
 
+    if (
+      unknownError instanceof CommanderError &&
+      unknownError.code === 'commander.version'
+    ) {
+      return {
+        command: { command: 'help' },
+        helpText: renderedHelpText,
+      }
+    }
+
     if (unknownError instanceof CommanderError) {
       throw new Error(normalizeCommanderError(unknownError.message))
     }
@@ -163,6 +174,7 @@ function buildProgram(
   const program = new Command()
   program
     .name('agent-fetch')
+    .version(packageJson.version, '-v, --version')
     .description('Robust URL fetch CLI for AI agents with fallback strategies.')
     .showHelpAfterError()
     .exitOverride()
